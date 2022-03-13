@@ -1,3 +1,6 @@
+# Data directory
+data/
+
 # Spyder's pylint directory
 .pylint.d/
 
