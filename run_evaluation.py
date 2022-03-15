@@ -24,6 +24,8 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     if len(list(plot_dir.glob('*.pdf'))) > 0:
         print('Plot directory is not empty. Files might be overwritten, but not deleted.')
 
+    results = data_handling.load_results(directory=results_dir)
+
 
 # Parse some command-line arguments and run the main routine.
 if __name__ == '__main__':

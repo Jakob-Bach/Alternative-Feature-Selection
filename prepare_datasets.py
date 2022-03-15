@@ -9,10 +9,17 @@ Usage: python -m prepare_datasets --help
 import argparse
 import pathlib
 
+import pandas as pd
 import pmlb
 import tqdm
 
 import data_handling
+
+
+# Manually defined by looking for similar dataset names and dataset properties on the website
+# https://epistasislab.github.io/pmlb/index.html
+DUPLICATE_DATASETS = ['agaricus_lepiota', 'kr_vs_kp', 'Hill_Valley_without_noise', 'german',
+                      'buggyCrx', 'crx', 'breast_cancer_wisconsin', 'vote', 'colic']
 
 
 # Main-routine: download, pre-process, and save (to "data_dir") datasets from PMLB.
@@ -23,6 +30,26 @@ def prepare_datasets(data_dir: pathlib.Path) -> None:
     if any(data_dir.iterdir()):
         print('Dataset directory is not empty. Files might be overwritten, but not deleted.')
 
+    # Get an overview of datasets and filter it
+    dataset_overview = pmlb.dataset_lists.df_summary
+    dataset_overview = dataset_overview[
+        (dataset_overview['task'] == 'classification') &
+        (dataset_overview['n_classes'] == 2) &
+        (dataset_overview['n_features'] >= 15)
+    ]  # filtering steps described in paper
+    assert pd.Series(DUPLICATE_DATASETS).isin(dataset_overview['dataset']).all()
+    dataset_overview = dataset_overview[~dataset_overview['dataset'].isin(DUPLICATE_DATASETS)]
+    assert len(dataset_overview) == 32  # if this changes, we would need to adapt paper as well
+    dataset_overview.to_csv(data_dir / '_data_overview.csv', index=False)
+
+    # Save individual datasets
+    print('Downloading and saving datasets ...')
+    for dataset_name in tqdm.tqdm(dataset_overview['dataset']):
+        dataset = pmlb.fetch_data(dataset_name=dataset_name, dropna=False)
+        assert dataset.notna().all().all()  # datasets we chose don't contain missing values
+        data_handling.save_dataset(X=dataset.drop(columns='target'), y=dataset['target'],
+                                   dataset_name=dataset_name, directory=data_dir)
+
 
 # Parse some command-line arguments and run the main routine.
 if __name__ == '__main__':
@@ -32,6 +59,6 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--directory', type=pathlib.Path, default='data/datasets/',
                         dest='data_dir', help='Output directory for datasets.')
-    print('Dataset preparation started')
+    print('Dataset preparation started.')
     prepare_datasets(**vars(parser.parse_args()))
     print('Datasets prepared and saved.')
