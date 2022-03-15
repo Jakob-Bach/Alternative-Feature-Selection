@@ -21,9 +21,6 @@ import feature_selection
 import prediction
 
 
-CV_FOLDS = 10
-
-
 # Main-routine: run complete experimental pipeline. This pipeline considers the cross-product of
 # datasets, feature-selection methods, settings for finding alternatives, and prediction models.
 # To that end, read datasets from "data_dir", save results to "results_dir". "n_processes" controls
