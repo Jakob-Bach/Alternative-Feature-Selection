@@ -4,6 +4,7 @@ Functions to express alternatives and search for them.
 """
 
 
+import math
 from typing import Any, Callable, Dict, Sequence, Union
 
 import mip
@@ -64,12 +65,14 @@ def search_sequentially(optimization_func: Callable, optimization_args: Dict[str
     s = [mip_model.add_var(name=f's_{j}', var_type=mip.BINARY) for j in range(n)]  # selections
     mip_model.add_constr(mip.xsum(s) == k)  # select exactly k
     optimization_args = {'mip_model': mip_model, 's_list': [s], **optimization_args}
-    results.extend(optimization_func(**optimization_args))  # original feature set
+    results.append(optimization_func(**optimization_args))  # results for original feature set
     for _ in range(num_alternatives):
-        add_pairwise_alternative_constraint(mip_model=mip_model, s1=[var.x for var in s], s2=s,
-                                            k=k, tau=tau)  # alternative to all prior solutions
-        results.extend(optimization_func(**optimization_args))
-    return results
+        if not math.isnan(results[-1]['train_objective'].iloc[0]):  # if not infeasible
+            s_value = [j in results[-1]['selected_idxs'].iloc[0] for j in range(n)]  # last solution
+            add_pairwise_alternative_constraint(mip_model=mip_model, s1=s_value, s2=s,
+                                                k=k, tau=tau)  # alternative to all prior solutions
+        results.append(optimization_func(**optimization_args))
+    return pd.concat(results, ignore_index=True)
 
 
 # Simultaneously search for alternative feature sets. This routine represents the overall procedure

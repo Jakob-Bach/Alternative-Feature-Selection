@@ -31,8 +31,10 @@ def split_for_pipeline(X: pd.DataFrame, y: pd.Series) -> Generator[Tuple[np.ndar
 
 # Train and evaluate a model. Return a dictionary with prediction performances.
 def train_and_evaluate(
-        model: sklearn.base.BaseEstimator, X_train: pd.DataFrame, y_train: pd.DataFrame,
-        X_test: pd.DataFrame, y_test: pd.DataFrame = None) -> Dict[str, float]:
+        model: sklearn.base.BaseEstimator, X_train: pd.DataFrame, y_train: pd.Series,
+        X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, float]:
+    if len(X_train.columns) == 0:  # no features selected (no valid solution found)
+        return {'train_mcc': float('nan'), 'test_mcc': float('nan')}
     model.fit(X=X_train, y=y_train)
     pred_train = model.predict(X=X_train)
     pred_test = model.predict(X=X_test)

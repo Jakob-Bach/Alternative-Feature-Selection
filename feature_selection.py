@@ -4,7 +4,6 @@ Functions to express feature-set quality for different feature-selection methods
 """
 
 
-import itertools
 import time
 from typing import Sequence, Tuple
 
@@ -35,7 +34,7 @@ def add_mi_objective(mip_model: mip.Model, s_list: Sequence[Sequence[mip.Var]],
     q_test = mutual_info(X=X_test, y=y_test)
     q_test = q_test / q_test.sum()
     Q_test_list = [mip.xsum(q_j * s_j for (q_j, s_j) in zip(q_test, s)) for s in s_list]
-    mip_model.objective = mip.xsum(itertools.chain(*Q_train_list))  # sum over all feature sets
+    mip_model.objective = mip.xsum(Q_train_list)  # sum over all feature sets
     return Q_train_list, Q_test_list
 
 
@@ -100,7 +99,7 @@ def fs_fcbf(mip_model: mip.Model, s_list: Sequence[Sequence[mip.Var]], X_train: 
     # is deterministic (if seeded, as we do) for the overall (X, y) combination.
     # Here, we only consider each pair of features once.
     for j_1 in range(1, X_train.shape[1]):
-        mi_feature = mutual_info(X=X_train[:, :j_1], y=X_train.iloc[:, j_1])
+        mi_feature = mutual_info(X=X_train.iloc[:, :j_1], y=X_train.iloc[:, j_1])
         for j_2 in range(j_1):
             # If inter-correlation > target correlation, do not select both features:
             if (mi_target[j_1] <= mi_feature[j_2]) or (mi_target[j_2] <= mi_feature[j_2]):
@@ -130,23 +129,24 @@ def fs_greedy_wrapper(
             'test_objective': [float('nan') for _ in s_list],
         })
     else:
-        selected_idxs = [[j for (j, s_j) in enumerate(s) if s_j.x] for s in s_list]
+        s_value_list = [[bool(s_j.x) for s_j in s] for s in s_list]
         # Note that "training" quality actually is validation performance with a holdout split
-        Q_train_list = [prediction.evaluate_wrapper(model=prediction_model, X=X_train.iloc[:, idxs],
-                                                    y=y_train) for idxs in selected_idxs]
+        Q_train_list = [prediction.evaluate_wrapper(
+            model=prediction_model, X=X_train.iloc[:, s_value], y=y_train)
+            for s_value in s_value_list]
         j = 0  # other than pseudo-code in paper, 0-indexing here
         while (iters < max_iters) and (j < X_train.shape[1]):
-            swap_constraints = [mip_model.add_constr(s[j] == 0 if s[j].x else s[j] == 1)
-                                for s in s_list]
+            swap_constraints = [mip_model.add_constr(s[j] == 0 if s_value[j] else s[j] == 1)
+                                for (s, s_value) in zip(s_list, s_value_list)]
             optimization_status = mip_model.optimize()
             iters = iters + 1
             if optimization_status == mip.OptimizationStatus.OPTIMAL:
-                current_selected_idxs = [[j for (j, s_j) in enumerate(s) if s_j.x] for s in s_list]
+                current_s_value_list = [[bool(s_j.x) for s_j in s] for s in s_list]
                 current_Q_train_list = [prediction.evaluate_wrapper(
-                    model=prediction_model, X=X_train.iloc[:, idxs], y=y_train)
-                    for idxs in current_selected_idxs]
+                    model=prediction_model, X=X_train.iloc[:, s_value], y=y_train)
+                    for s_value in current_s_value_list]
                 if sum(current_Q_train_list) > sum(Q_train_list):
-                    selected_idxs = current_selected_idxs
+                    s_value_list = current_s_value_list
                     Q_train_list = current_Q_train_list
                     j = 1
                 else:
@@ -154,6 +154,8 @@ def fs_greedy_wrapper(
             else:
                 j = j + 1
             mip_model.remove(swap_constraints)
+        selected_idxs = [[j for (j, s_j_value) in enumerate(s_value) if s_j_value]
+                         for s_value in s_value_list]
         result = pd.DataFrame({
             'selected_idxs': selected_idxs,
             'train_objective': Q_train_list,
@@ -184,6 +186,6 @@ def fs_model_gain(
     # optimization (we only evaluate optimization objective with test importances retroactively)
     q_test = prediction_model.fit(X=X_test, y=y_test).feature_importances_
     Q_test_list = [mip.xsum(q_j * s_j for (q_j, s_j) in zip(q_test, s)) for s in s_list]
-    mip_model.objective = mip.xsum(itertools.chain(*Q_train_list))
+    mip_model.objective = mip.xsum(Q_train_list)
     return optimize_mip(mip_model=mip_model, s_list=s_list, Q_train_list=Q_train_list,
                         Q_test_list=Q_test_list)
