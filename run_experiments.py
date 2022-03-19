@@ -8,9 +8,10 @@ Usage: python -m run_experiments --help
 
 
 import argparse
+import itertools
 import multiprocessing
 import pathlib
-from typing import Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 import tqdm
@@ -19,6 +20,82 @@ import alternatives
 import data_handling
 import feature_selection
 import prediction
+
+
+# Different components of the experimental design, excluding search methods for alternatives
+# (defined below) and prediction models (defined in module "prediction").
+CV_FOLDS = 10
+FS_METHODS = [feature_selection.fs_mi, feature_selection.fs_fcbf,
+              feature_selection.fs_greedy_wrapper, feature_selection.fs_model_gain]
+K_VALUES = [5, 10]
+TAU_VALUES = [x / 10 for x in range(1, 11)]
+NUM_ALTERNATIVES_VALUES = list(range(1, 11))
+
+
+# Define experimental design as cross-product of various experimental components, in particular,
+# datasets, feature-selection methods, and search-methods for alternatives. (Missing: prediction
+# models, which will be iterated over later.) The resulting configurations can be run parallelized.
+def define_experimental_settings(data_dir: pathlib.Path) -> List[Dict[str, Any]]:
+    results = []
+    dataset_names_list = data_handling.list_datasets(directory=data_dir)
+    for dataset_name, fs_method, k, tau in itertools.product(
+            dataset_names_list, FS_METHODS, K_VALUES, TAU_VALUES):
+        base_setting = {'dataset_name': dataset_name, 'data_dir': data_dir}
+        # For sequential search, returning more alternatives does not affect prior results, so using
+        # max number of alternatives suffices; for simultaneous search, this is not the case.
+        results.append({**base_setting, 'alternatives_func': alternatives.search_sequentially,
+                        'alternatives_args': {'optimization_func': fs_method, 'k': k, 'tau': tau,
+                                              'num_alternatives': max(NUM_ALTERNATIVES_VALUES)}})
+        for num_alternatives in NUM_ALTERNATIVES_VALUES:
+            results.append({**base_setting, 'alternatives_func': alternatives.search_simultaneously,
+                            'alternatives_args': {'optimization_func': fs_method, 'k': k, 'tau': tau,
+                                                  'num_alternatives': num_alternatives}})
+    return results
+
+
+# Evaluate one approach to find alternatives for one dataset and feature-selection method. The
+# datasets with the "dataset_name" is read in from the "data_dir". "alternatives_func" does the
+# search for alternative feature sets. All the arguments of the search (including the
+# feature-selection method, which determines the objective of the search) are hidden in
+# "alternatives_args".
+# Return a table with various evaluation metrics, including parametrization of the search,
+# objective value, and prediction performance with the feature sets found.
+def run_experimental_setting(dataset_name: str, data_dir: pathlib.Path, alternatives_func: Callable,
+                             alternatives_args: Dict[str, Any]) -> pd.DataFrame:
+    results = []
+    X, y = data_handling.load_dataset(dataset_name=dataset_name, directory=data_dir)
+    alternatives_args['n'] = X.shape[1]
+    for fold_id, (train_idx, test_idx) in enumerate(prediction.split_for_pipeline(X=X, y=y)):
+        X_train = X.iloc[train_idx]
+        y_train = y.iloc[train_idx]
+        X_test = X.iloc[test_idx]
+        y_test = y.iloc[test_idx]
+        alternatives_args['optimization_args'] = {'X_train': X_train, 'y_train': y_train,
+                                                  'X_test': X_test, 'y_test': y_test}
+        result = alternatives_func(**alternatives_args)
+        for model_dict in prediction.MODELS:  # train each model with all feature sets found
+            model = model_dict['func'](**model_dict['args'])
+            prediction_performances = [prediction.train_and_evaluate(
+                model=model, X_train=X_train.iloc[:, selected_idxs], y_train=y_train,
+                X_test=X_test.iloc[:, selected_idxs], y_test=y_test)
+                for selected_idxs in result['selected_idxs']]
+            prediction_performances = pd.DataFrame(prediction_performances)
+            prediction_performances.rename(columns={x: model_dict['name'] + '_' + x
+                                                    for x in prediction_performances.columns},
+                                           inplace=True)  # put model name before metric name
+            result = pd.concat([result, prediction_performances], axis='columns')
+        result.drop(columns='selected_idxs')
+        result['fold_id'] = fold_id
+        results.append(result)
+    results = pd.concat(results, ignore_index=True)
+    results['dataset_name'] = dataset_name
+    results['alternatives_func'] = alternatives_func.__name__
+    results['fs_func'] = alternatives_args['optimization_func'].__name__
+    results['n'] = alternatives_args['n']
+    results['k'] = alternatives_args['k']
+    results['tau'] = alternatives_args['tau']
+    results['num_alternatives'] = alternatives_args['num_alternatives']
+    return results
 
 
 # Main-routine: run complete experimental pipeline. This pipeline considers the cross-product of
@@ -34,6 +111,16 @@ def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
         results_dir.mkdir(parents=True)
     if any(results_dir.iterdir()):
         print('Results directory is not empty. Files might be overwritten, but not deleted.')
+    experimental_settings_list = define_experimental_settings(data_dir=data_dir)
+    progress_bar = tqdm.tqdm(total=len(experimental_settings_list))
+    process_pool = multiprocessing.Pool(processes=n_processes)
+    results = [process_pool.apply_async(run_experimental_setting, kwds=experimental_setting,
+                                        callback=lambda x: progress_bar.update())
+               for experimental_setting in experimental_settings_list]
+    process_pool.close()
+    process_pool.join()
+    results = pd.concat([x.get() for x in results])
+    data_handling.save_results(results, directory=results_dir)
 
 
 # Parse some command-line arguments and run the main routine.

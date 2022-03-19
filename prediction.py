@@ -8,6 +8,7 @@ from typing import Dict, Generator, Tuple
 
 import numpy as np
 import pandas as pd
+import sklearn.base
 import sklearn.ensemble
 import sklearn.metrics
 import sklearn.model_selection
@@ -20,6 +21,11 @@ MODELS = [
     {'name': 'Random forest', 'func': sklearn.ensemble.RandomForestClassifier,
      'args': {'n_estimators': 100, 'criterion': 'entropy', 'random_state': 25}}
 ]
+
+
+# Return the default prediction model for embedded and wrapper feature selection.
+def create_model_for_fs() -> sklearn.base.BaseEstimator:
+    return sklearn.tree.DecisionTreeClassifier(criterion='entropy', random_state=25)
 
 
 # Split a dataset for the experimental pipeline. Return the split indices.

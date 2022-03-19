@@ -5,7 +5,7 @@ Functions to express feature-set quality for different feature-selection methods
 
 
 import time
-from typing import Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import mip
 import numpy as np
@@ -117,7 +117,9 @@ def fs_fcbf(mip_model: mip.Model, s_list: Sequence[Sequence[mip.Var]], X_train: 
 def fs_greedy_wrapper(
         mip_model: mip.Model, s_list: Sequence[Sequence[mip.Var]],
         X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series,
-        prediction_model: sklearn.base.BaseEstimator, max_iters: int = 1000) -> pd.DataFrame:
+        prediction_model: Optional[sklearn.base.BaseEstimator] = None, max_iters: int = 1000) -> pd.DataFrame:
+    if prediction_model is None:
+        prediction_model = prediction.create_model_for_fs()
     start_time = time.process_time()
     mip_model.objective = 0  # don't optimize, only search for valid solutions
     optimization_status = mip_model.optimize()
@@ -179,7 +181,9 @@ def fs_greedy_wrapper(
 def fs_model_gain(
         mip_model: mip.Model, s_list: Sequence[Sequence[mip.Var]],
         X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series,
-        prediction_model: sklearn.base.BaseEstimator) -> pd.DataFrame:
+        prediction_model: Optional[sklearn.base.BaseEstimator] = None) -> pd.DataFrame:
+    if prediction_model is None:
+        prediction_model = prediction.create_model_for_fs()
     q_train = prediction_model.fit(X=X_train, y=y_train).feature_importances_
     Q_train_list = [mip.xsum(q_j * s_j for (q_j, s_j) in zip(q_train, s)) for s in s_list]
     # Fitting to test set might look fishy, but test importances don't influence feature selection /
