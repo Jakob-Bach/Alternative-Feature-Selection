@@ -98,14 +98,15 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         model.add_constr(1 + var >= var1 + var2)
         return var
 
-    # Return a constraint such that the Jaccard distance between two feature sets of desired size
-    # "k" is over a threshold "tau". The selection decisions "s2" for the 2nd feature set are
-    # unknown (thus they are "mip" variables), while the decisions "s1" for the first feature set
-    # can be either unknown ("mip" variables) or known (vector of 0/1 or false/true).
+    # Return a constraint such that the dissimilarity between two feature sets of desired size "k"
+    # is over a threshold "tau". The selection decisions "s2" for the 2nd feature set are unknown
+    # (thus, they are "mip" variables), while the decisions "s1" for the first feature set can be
+    # either unknown ("mip" variables) or known (vector of 0/1 or false/true).
+    # Currently supported for "d_name" are "dice" and "jaccard".
     @staticmethod
     def create_pairwise_alternative_constraint(
             s1: Sequence[Union[mip.Var, int, bool]], s2: Sequence[mip.Var], k: int,
-            tau: float) -> mip.LinExpr:
+            tau: float, d_name: str = 'dice') -> mip.LinExpr:
         assert len(s1) == len(s2), 'Decision vectors s1 and s2 need to have same length.'
         assert isinstance(s2[0], mip.Var), 's2 needs to contain variables, only s1 might be fixed.'
         if isinstance(s1[0], mip.Var):  # both features sets undetermined
@@ -113,16 +114,22 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
                                     for (s1_j, s2_j) in zip(s1, s2))
         else:  # one feature set known, so plain sum
             overlap_size = mip.xsum(s2_j for (s1_j, s2_j) in zip(s1, s2) if s1_j)
-        return overlap_size <= (1 - tau) / (2 - tau) * 2 * k
+        if d_name == 'dice':  # as same size of both sets, also equivalent to some other measures
+            return overlap_size <= (1 - tau) * k
+        if d_name == 'jaccard':
+            return overlap_size <= (1 - tau) / (2 - tau) * 2 * k
+        raise ValueError('Unknown dissimilarity measure.')
 
     # Sequentially search for alternative feature sets, iteratively adding constraints and calling
     # a feature-selection method that need to be implemented in a subclass.
     # - "k": number of features to select
-    # - "tau": (Jaccard) distance threshold for being alternative
+    # - "tau": dissimilarity threshold for being alternative
     # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
+    # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time").
-    def search_sequentially(self, k: int, tau: float, num_alternatives: int) -> pd.DataFrame:
+    def search_sequentially(self, k: int, tau: float, num_alternatives: int,
+                            d_name: str = 'dice') -> pd.DataFrame:
         results = []
         model = AlternativeFeatureSelector.create_model()
         s = [model.add_var(name=f's_{j}', var_type=mip.BINARY) for j in range(self._n)]
@@ -133,19 +140,22 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         for _ in range(num_alternatives):
             if not math.isnan(results[-1]['train_objective'].iloc[0]):  # if not infeasible
                 s_value = [j in results[-1]['selected_idxs'].iloc[0] for j in range(self._n)]
+                # Feature set different to previous selection:
                 model.add_constr(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
-                    s1=s_value, s2=s, k=k, tau=tau))  # feature set different to prior selections
+                    s1=s_value, s2=s, k=k, tau=tau, d_name=d_name))
             results.append(self.select_and_evaluate(model=model, s_list=s_list))
         return pd.concat(results, ignore_index=True)
 
     # Simultaneously search for alternative feature sets, only generating constraints once and then
     # calling a feature-selection method that need to be implemented in a subclass.
     # - "k": number of features to select
-    # - "tau": (Jaccard) distance threshold for being alternative
+    # - "tau": dissimilarity threshold for being alternative
     # - "num_alternatives": number of returned feature sets - 1 (one set is considered "original")
+    # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time").
-    def search_simultaneously(self, k: int, tau: float, num_alternatives: int) -> pd.DataFrame:
+    def search_simultaneously(self, k: int, tau: float, num_alternatives: int,
+                              d_name: str = 'dice') -> pd.DataFrame:
         model = AlternativeFeatureSelector.create_model()
         s_list = []
         for i in range(num_alternatives + 1):  # find "num_alternatives" + 1 feature sets
@@ -153,7 +163,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
             model.add_constr(mip.xsum(s) == k)
             for s2 in s_list:
                 model.add_constr(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
-                    s1=s, s2=s2, k=k, tau=tau))
+                    s1=s, s2=s2, k=k, tau=tau, d_name=d_name))
             s_list.append(s)
         self.initialize_model(model=model, s_list=s_list)
         return self.select_and_evaluate(model=model, s_list=s_list)
