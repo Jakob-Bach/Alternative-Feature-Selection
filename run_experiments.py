@@ -8,10 +8,9 @@ Usage: python -m run_experiments --help
 
 
 import argparse
-import itertools
 import multiprocessing
 import pathlib
-from typing import Any, Dict, List, Optional, Type
+from typing import Optional, Type
 
 import pandas as pd
 import tqdm
@@ -21,88 +20,79 @@ import data_handling
 import prediction
 
 
-# Different components of the experimental design, excluding search methods for alternatives
-# (defined below) and prediction models (defined in module "prediction").
-CV_FOLDS = 10
-FEATURE_SELECTOR_TYPES = [afs.MISelector, afs.FCBFSelector, afs.ModelImportanceSelector,
-                          afs.GreedyWrapperSelector]
-K_VALUES = [5, 10]
-TAU_VALUES = [x / 10 for x in range(1, 11)]
-NUM_ALTERNATIVES_VALUES = list(range(1, 11))
+# Different components of the experimental design, excluding names of the search methods for
+# alternatives (hard-coded below) and prediction models (queried from the module "prediction").
+N_FOLDS = 10  # cross-validation for search and predictions
+FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.MISelector, afs.ModelImportanceSelector]
+K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
+NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search
+NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
 
 
-# Define experimental design as cross-product of various experimental components, in particular,
-# datasets, feature-selection methods, and search-methods for alternatives. (Missing: prediction
-# models, which will be iterated over later.) The resulting configurations can be run parallelized.
-def define_experimental_settings(data_dir: pathlib.Path) -> List[Dict[str, Any]]:
-    results = []
-    dataset_names_list = data_handling.list_datasets(directory=data_dir)
-    for dataset_name, feature_selector_types, k, tau in itertools.product(
-            dataset_names_list, FEATURE_SELECTOR_TYPES, K_VALUES, TAU_VALUES):
-        base_setting = {'dataset_name': dataset_name, 'data_dir': data_dir}
-        # For sequential search, returning more alternatives does not affect prior results, so using
-        # max number of alternatives suffices; for simultaneous search, this is not the case.
-        results.append({**base_setting, 'alternatives_func': 'search_sequentially',
-                        'alternatives_args': {'k': k, 'tau': tau,
-                                              'num_alternatives': max(NUM_ALTERNATIVES_VALUES)},
-                       'feature_selector_type': feature_selector_types})
-        for num_alternatives in NUM_ALTERNATIVES_VALUES:
-            results.append({**base_setting, 'alternatives_func': 'search_simultaneously',
-                            'alternatives_args': {'k': k, 'tau': tau,
-                                                  'num_alternatives': num_alternatives},
-                            'feature_selector_type': feature_selector_types})
-    return results
-
-
-# Evaluate one approach to find alternatives for one dataset and feature-selection method. The
-# datasets with the "dataset_name" is read in from the "data_dir". "alternatives_func" does the
-# search for alternative feature sets. All the arguments of the search (including the
-# feature-selection method, which determines the objective of the search) are hidden in
-# "alternatives_args".
+# Evaluate one search for alternatives for one feature selection method (on one split of a dataset).
+# In particular, call the "afs_search_func_name" on the "feature_selector", considering the
+# parameters "k", "tau", and "num_alternatives".
 # Return a table with various evaluation metrics, including parametrization of the search,
 # objective value, and prediction performance with the feature sets found.
-def run_experimental_setting(
-        dataset_name: str, data_dir: pathlib.Path, alternatives_func: str, alternatives_args: Dict[str, Any],
+def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_search_func_name: str,
+                        k: int, tau: float, num_alternatives: int) -> pd.DataFrame:
+    X_train, X_test, y_train, y_test = feature_selector.get_data()
+    afs_search_func = getattr(feature_selector, afs_search_func_name)
+    result = afs_search_func(k=k, tau=tau, num_alternatives=num_alternatives)
+    for model_dict in prediction.MODELS:  # train each model with all feature sets found
+        model = model_dict['func'](**model_dict['args'])
+        prediction_performances = [prediction.train_and_evaluate(
+            model=model, X_train=X_train.iloc[:, selected_idxs], y_train=y_train,
+            X_test=X_test.iloc[:, selected_idxs], y_test=y_test)
+            for selected_idxs in result['selected_idxs']]
+        prediction_performances = pd.DataFrame(prediction_performances)
+        prediction_performances.rename(columns={x: model_dict['name'] + '_' + x
+                                                for x in prediction_performances.columns},
+                                       inplace=True)  # put model name before metric name
+        result = pd.concat([result, prediction_performances], axis='columns')
+    result['k'] = k
+    result['tau'] = tau
+    result['num_alternatives'] = num_alternatives
+    result['search_name'] = afs_search_func_name
+    return result
+
+
+# Evaluate one feature-selection method on one split of a dataset. The dataset with the
+# "dataset_name" is read in from the "data_dir" and the "split_idx"-th split is extracted.
+# "feature_selector_type" is a class with methods for feature selection and search for alternatives.
+# We iterate over all settings for searching alternatives.
+# Return a table with various evaluation metrics, including parametrization of the search,
+# objective value, and prediction performance with the feature sets found.
+def evaluate_feature_selector(
+        dataset_name: str, data_dir: pathlib.Path, split_idx: int,
         feature_selector_type: Type[afs.AlternativeFeatureSelector]) -> pd.DataFrame:
     results = []
     X, y = data_handling.load_dataset(dataset_name=dataset_name, directory=data_dir)
     feature_selector = feature_selector_type()
-    alternatives_func = getattr(feature_selector, alternatives_func)
-    for fold_id, (train_idx, test_idx) in enumerate(prediction.split_for_pipeline(X=X, y=y)):
-        X_train = X.iloc[train_idx]
-        y_train = y.iloc[train_idx]
-        X_test = X.iloc[test_idx]
-        y_test = y.iloc[test_idx]
-        feature_selector.set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
-        result = alternatives_func(**alternatives_args)
-        for model_dict in prediction.MODELS:  # train each model with all feature sets found
-            model = model_dict['func'](**model_dict['args'])
-            prediction_performances = [prediction.train_and_evaluate(
-                model=model, X_train=X_train.iloc[:, selected_idxs], y_train=y_train,
-                X_test=X_test.iloc[:, selected_idxs], y_test=y_test)
-                for selected_idxs in result['selected_idxs']]
-            prediction_performances = pd.DataFrame(prediction_performances)
-            prediction_performances.rename(columns={x: model_dict['name'] + '_' + x
-                                                    for x in prediction_performances.columns},
-                                           inplace=True)  # put model name before metric name
-            result = pd.concat([result, prediction_performances], axis='columns')
-        result['fold_id'] = fold_id
-        results.append(result)
+    train_idx, test_idx = list(prediction.split_for_pipeline(X=X, y=y, n_splits=N_FOLDS))[split_idx]
+    feature_selector.set_data(X_train=X.iloc[train_idx], X_test=X.iloc[test_idx],
+                              y_train=y.iloc[train_idx], y_test=y.iloc[test_idx])
+    for k in K_VALUES:
+        for tau in [x / k for x in range(1, k + 1)]:  # all overlap sizes (except complete overlap)
+            results.append(evaluate_one_search(
+                feature_selector=feature_selector, afs_search_func_name='search_sequentially',
+                k=k, tau=tau, num_alternatives=NUM_ALTERNATIVES_SEQUENTIAL))
+            for num_alternatives in NUM_ALTERNATIVES_SIMULTANEOUS_VALUES:
+                results.append(evaluate_one_search(
+                    feature_selector=feature_selector, afs_search_func_name='search_simultaneously',
+                    k=k, tau=tau, num_alternatives=num_alternatives))
     results = pd.concat(results, ignore_index=True)
+    results['fs_name'] = feature_selector_type.__name__
     results['dataset_name'] = dataset_name
-    results['alternatives_func'] = alternatives_func.__name__
-    results['fs_func'] = feature_selector_type.__name__
     results['n'] = X.shape[1]
-    results['k'] = alternatives_args['k']
-    results['tau'] = alternatives_args['tau']
-    results['num_alternatives'] = alternatives_args['num_alternatives']
+    results['split_idx'] = split_idx
     return results
 
 
-# Main-routine: run complete experimental pipeline. This pipeline considers the cross-product of
-# datasets, feature-selection methods, settings for finding alternatives, and prediction models.
+# Main-routine: run complete experimental pipeline. This pipeline roughly considers a cross-product
+# of datasets, feature-selection methods, settings for finding alternatives, and prediction models.
 # To that end, read datasets from "data_dir", save results to "results_dir". "n_processes" controls
-# parallelization.
+# parallelization (over datasets, cross-validation folds, and feature-selection methods).
 def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
                     n_processes: Optional[int] = None) -> None:
     if not data_dir.is_dir():
@@ -112,12 +102,15 @@ def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
         results_dir.mkdir(parents=True)
     if any(results_dir.iterdir()):
         print('Results directory is not empty. Files might be overwritten, but not deleted.')
-    experimental_settings_list = define_experimental_settings(data_dir=data_dir)
-    progress_bar = tqdm.tqdm(total=len(experimental_settings_list))
+    dataset_names_list = data_handling.list_datasets(directory=data_dir)
+    progress_bar = tqdm.tqdm(total=len(dataset_names_list) * len(FEATURE_SELECTOR_TYPES) * N_FOLDS)
     process_pool = multiprocessing.Pool(processes=n_processes)
-    results = [process_pool.apply_async(run_experimental_setting, kwds=experimental_setting,
-                                        callback=lambda x: progress_bar.update())
-               for experimental_setting in experimental_settings_list]
+    results = [process_pool.apply_async(evaluate_feature_selector, kwds={
+        'dataset_name': dataset_name, 'data_dir': data_dir, 'split_idx': split_idx,
+        'feature_selector_type': feature_selector_type}, callback=lambda x: progress_bar.update())
+        for dataset_name in dataset_names_list
+        for split_idx in range(N_FOLDS)
+        for feature_selector_type in FEATURE_SELECTOR_TYPES]
     process_pool.close()
     process_pool.join()
     results = pd.concat([x.get() for x in results])

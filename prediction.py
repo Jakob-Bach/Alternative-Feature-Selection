@@ -29,9 +29,10 @@ def create_model_for_fs() -> sklearn.base.BaseEstimator:
 
 
 # Split a dataset for the experimental pipeline. Return the split indices.
-def split_for_pipeline(X: pd.DataFrame, y: pd.Series) -> Generator[Tuple[np.ndarray, np.ndarray],
-                                                                   None, None]:
-    splitter = sklearn.model_selection.StratifiedKFold(n_splits=10, shuffle=True, random_state=25)
+def split_for_pipeline(X: pd.DataFrame, y: pd.Series, n_splits: int = 10)\
+        -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+    splitter = sklearn.model_selection.StratifiedKFold(n_splits=n_splits, shuffle=True,
+                                                       random_state=25)
     return splitter.split(X=X, y=y)
 
 

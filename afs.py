@@ -9,7 +9,7 @@ Classes for alternative feature selection, i.e.,
 from abc import ABCMeta, abstractmethod
 import math
 import time
-from typing import Iterable, Optional, Union, Sequence
+from typing import Iterable, Optional, Union, Sequence, Tuple
 
 import mip
 import numpy as np
@@ -50,6 +50,10 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         self._y_train = y_train
         self._y_test = y_test
         self._n = X_train.shape[1]
+
+    # Return the train-test split of the feature selector as (X_train, X_test, y_train, y_test).
+    def get_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+        return self._X_train, self._X_test, self._y_train, self._y_test
 
     # Return a fresh "mip" model in which the constraints for alternatives will be stored. Do some
     # initialization that is independent from the feature-selection method used (while
