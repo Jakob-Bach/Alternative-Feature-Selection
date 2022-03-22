@@ -11,22 +11,21 @@ import argparse
 import itertools
 import multiprocessing
 import pathlib
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import pandas as pd
 import tqdm
 
-import alternatives
+import afs
 import data_handling
-import feature_selection
 import prediction
 
 
 # Different components of the experimental design, excluding search methods for alternatives
 # (defined below) and prediction models (defined in module "prediction").
 CV_FOLDS = 10
-FS_METHODS = [feature_selection.fs_mi, feature_selection.fs_fcbf,
-              feature_selection.fs_greedy_wrapper, feature_selection.fs_model_gain]
+FEATURE_SELECTOR_TYPES = [afs.MISelector, afs.FCBFSelector, afs.ModelImportanceSelector,
+                          afs.GreedyWrapperSelector]
 K_VALUES = [5, 10]
 TAU_VALUES = [x / 10 for x in range(1, 11)]
 NUM_ALTERNATIVES_VALUES = list(range(1, 11))
@@ -38,18 +37,20 @@ NUM_ALTERNATIVES_VALUES = list(range(1, 11))
 def define_experimental_settings(data_dir: pathlib.Path) -> List[Dict[str, Any]]:
     results = []
     dataset_names_list = data_handling.list_datasets(directory=data_dir)
-    for dataset_name, fs_method, k, tau in itertools.product(
-            dataset_names_list, FS_METHODS, K_VALUES, TAU_VALUES):
+    for dataset_name, feature_selector_types, k, tau in itertools.product(
+            dataset_names_list, FEATURE_SELECTOR_TYPES, K_VALUES, TAU_VALUES):
         base_setting = {'dataset_name': dataset_name, 'data_dir': data_dir}
         # For sequential search, returning more alternatives does not affect prior results, so using
         # max number of alternatives suffices; for simultaneous search, this is not the case.
-        results.append({**base_setting, 'alternatives_func': alternatives.search_sequentially,
-                        'alternatives_args': {'optimization_func': fs_method, 'k': k, 'tau': tau,
-                                              'num_alternatives': max(NUM_ALTERNATIVES_VALUES)}})
+        results.append({**base_setting, 'alternatives_func': 'search_sequentially',
+                        'alternatives_args': {'k': k, 'tau': tau,
+                                              'num_alternatives': max(NUM_ALTERNATIVES_VALUES)},
+                       'feature_selector_type': feature_selector_types})
         for num_alternatives in NUM_ALTERNATIVES_VALUES:
-            results.append({**base_setting, 'alternatives_func': alternatives.search_simultaneously,
-                            'alternatives_args': {'optimization_func': fs_method, 'k': k, 'tau': tau,
-                                                  'num_alternatives': num_alternatives}})
+            results.append({**base_setting, 'alternatives_func': 'search_simultaneously',
+                            'alternatives_args': {'k': k, 'tau': tau,
+                                                  'num_alternatives': num_alternatives},
+                            'feature_selector_type': feature_selector_types})
     return results
 
 
@@ -60,18 +61,19 @@ def define_experimental_settings(data_dir: pathlib.Path) -> List[Dict[str, Any]]
 # "alternatives_args".
 # Return a table with various evaluation metrics, including parametrization of the search,
 # objective value, and prediction performance with the feature sets found.
-def run_experimental_setting(dataset_name: str, data_dir: pathlib.Path, alternatives_func: Callable,
-                             alternatives_args: Dict[str, Any]) -> pd.DataFrame:
+def run_experimental_setting(
+        dataset_name: str, data_dir: pathlib.Path, alternatives_func: str, alternatives_args: Dict[str, Any],
+        feature_selector_type: Type[afs.AlternativeFeatureSelector]) -> pd.DataFrame:
     results = []
     X, y = data_handling.load_dataset(dataset_name=dataset_name, directory=data_dir)
-    alternatives_args['n'] = X.shape[1]
+    feature_selector = feature_selector_type()
+    alternatives_func = getattr(feature_selector, alternatives_func)
     for fold_id, (train_idx, test_idx) in enumerate(prediction.split_for_pipeline(X=X, y=y)):
         X_train = X.iloc[train_idx]
         y_train = y.iloc[train_idx]
         X_test = X.iloc[test_idx]
         y_test = y.iloc[test_idx]
-        alternatives_args['optimization_args'] = {'X_train': X_train, 'y_train': y_train,
-                                                  'X_test': X_test, 'y_test': y_test}
+        feature_selector.set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
         result = alternatives_func(**alternatives_args)
         for model_dict in prediction.MODELS:  # train each model with all feature sets found
             model = model_dict['func'](**model_dict['args'])
@@ -84,14 +86,13 @@ def run_experimental_setting(dataset_name: str, data_dir: pathlib.Path, alternat
                                                     for x in prediction_performances.columns},
                                            inplace=True)  # put model name before metric name
             result = pd.concat([result, prediction_performances], axis='columns')
-        result.drop(columns='selected_idxs')
         result['fold_id'] = fold_id
         results.append(result)
     results = pd.concat(results, ignore_index=True)
     results['dataset_name'] = dataset_name
     results['alternatives_func'] = alternatives_func.__name__
-    results['fs_func'] = alternatives_args['optimization_func'].__name__
-    results['n'] = alternatives_args['n']
+    results['fs_func'] = feature_selector_type.__name__
+    results['n'] = X.shape[1]
     results['k'] = alternatives_args['k']
     results['tau'] = alternatives_args['tau']
     results['num_alternatives'] = alternatives_args['num_alternatives']
