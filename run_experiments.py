@@ -36,10 +36,10 @@ NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
 # Return a table with various evaluation metrics, including parametrization of the search,
 # objective value, and prediction performance with the feature sets found.
 def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_search_func_name: str,
-                        k: int, tau: float, num_alternatives: int) -> pd.DataFrame:
+                        k: int, tau_abs: int, num_alternatives: int) -> pd.DataFrame:
     X_train, X_test, y_train, y_test = feature_selector.get_data()
     afs_search_func = getattr(feature_selector, afs_search_func_name)
-    result = afs_search_func(k=k, tau=tau, num_alternatives=num_alternatives)
+    result = afs_search_func(k=k, tau_abs=tau_abs, num_alternatives=num_alternatives)
     for model_dict in prediction.MODELS:  # train each model with all feature sets found
         model = model_dict['func'](**model_dict['args'])
         prediction_performances = [prediction.train_and_evaluate(
@@ -52,7 +52,7 @@ def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_se
                                        inplace=True)  # put model name before metric name
         result = pd.concat([result, prediction_performances], axis='columns')
     result['k'] = k
-    result['tau'] = tau
+    result['tau_abs'] = tau_abs
     result['num_alternatives'] = num_alternatives
     result['search_name'] = afs_search_func_name
     return result
@@ -75,14 +75,14 @@ def evaluate_feature_selector(
     feature_selector.set_data(X_train=X.iloc[train_idx], X_test=X.iloc[test_idx],
                               y_train=y.iloc[train_idx], y_test=y.iloc[test_idx])
     for k in K_VALUES:
-        for tau in [x / k for x in range(1, k + 1)]:  # all overlap sizes (except complete overlap)
+        for tau_abs in range(1, k + 1):  # all overlap sizes (except complete overlap)
             results.append(evaluate_one_search(
                 feature_selector=feature_selector, afs_search_func_name='search_sequentially',
-                k=k, tau=tau, num_alternatives=NUM_ALTERNATIVES_SEQUENTIAL))
+                k=k, tau_abs=tau_abs, num_alternatives=NUM_ALTERNATIVES_SEQUENTIAL))
             for num_alternatives in NUM_ALTERNATIVES_SIMULTANEOUS_VALUES:
                 results.append(evaluate_one_search(
                     feature_selector=feature_selector, afs_search_func_name='search_simultaneously',
-                    k=k, tau=tau, num_alternatives=num_alternatives))
+                    k=k, tau_abs=tau_abs, num_alternatives=num_alternatives))
     results = pd.concat(results, ignore_index=True)
     results['fs_name'] = feature_selector_type.__name__
     results['dataset_name'] = dataset_name
