@@ -63,9 +63,10 @@ def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_se
 # "feature_selector_type" is a class with methods for feature selection and search for alternatives.
 # We iterate over all settings for searching alternatives.
 # Return a table with various evaluation metrics, including parametrization of the search,
-# objective value, and prediction performance with the feature sets found.
+# objective value, and prediction performance with the feature sets found. Additionally, save this
+# table to "results_dir".
 def evaluate_feature_selector(
-        dataset_name: str, data_dir: pathlib.Path, split_idx: int,
+        dataset_name: str, data_dir: pathlib.Path, results_dir: pathlib.Path, split_idx: int,
         feature_selector_type: Type[afs.AlternativeFeatureSelector]) -> pd.DataFrame:
     results = []
     X, y = data_handling.load_dataset(dataset_name=dataset_name, directory=data_dir)
@@ -87,6 +88,8 @@ def evaluate_feature_selector(
     results['dataset_name'] = dataset_name
     results['n'] = X.shape[1]
     results['split_idx'] = split_idx
+    data_handling.save_results(results=results, directory=results_dir, dataset_name=dataset_name,
+                               split_idx=split_idx, fs_name=feature_selector_type.__name__)
     return results
 
 
@@ -107,8 +110,9 @@ def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
     progress_bar = tqdm.tqdm(total=len(dataset_names_list) * len(FEATURE_SELECTOR_TYPES) * N_FOLDS)
     process_pool = multiprocessing.Pool(processes=n_processes)
     results = [process_pool.apply_async(evaluate_feature_selector, kwds={
-        'dataset_name': dataset_name, 'data_dir': data_dir, 'split_idx': split_idx,
-        'feature_selector_type': feature_selector_type}, callback=lambda x: progress_bar.update())
+        'dataset_name': dataset_name, 'data_dir': data_dir, 'results_dir': results_dir,
+        'split_idx': split_idx, 'feature_selector_type': feature_selector_type},
+        callback=lambda x: progress_bar.update())
         for dataset_name in dataset_names_list
         for split_idx in range(N_FOLDS)
         for feature_selector_type in FEATURE_SELECTOR_TYPES]
