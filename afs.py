@@ -238,7 +238,7 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
                 'test_objective': [float('nan') for _ in self._Q_test_list]
             })
         result['optimization_time'] = end_time - start_time
-        result['optimization_status'] = optimization_status
+        result['optimization_status'] = optimization_status.name
         return result
 
 
@@ -411,6 +411,6 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
             })
         end_time = time.process_time()
         result['optimization_time'] = end_time - start_time
-        result['optimization_status'] = optimization_status
+        result['optimization_status'] = optimization_status.name
         result['iters'] = iters
         return result
