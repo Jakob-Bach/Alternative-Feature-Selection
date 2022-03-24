@@ -65,6 +65,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         model.verbose = 0
         model.threads = 1
         model.seed = 25
+        model.max_seconds = 60  # optimization timeout; solver might still find feasible solution
         return model
 
     # Initialize a "mip" model for alternative feature sets specific to the feature-selection method
@@ -82,7 +83,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # See "initialize_model()" for a description of the parameters.
     # Should returns a table of results, where each row is a feature set (column "selected_idxs",
     # type "Sequence[int]") accompanied by metrics (columns: "train_objective", "test_objective",
-    # "optimization_time").
+    # "optimization_time", "optimization_status").
     @abstractmethod
     def select_and_evaluate(self, model: mip.Model,
                             s_list: Sequence[Sequence[mip.Var]]) -> pd.DataFrame:
@@ -131,7 +132,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
     # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
-    # "optimization_time").
+    # "optimization_time", "optimization_status").
     def search_sequentially(self, k: int, tau: float, num_alternatives: int,
                             d_name: str = 'dice') -> pd.DataFrame:
         results = []
@@ -157,7 +158,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "num_alternatives": number of returned feature sets - 1 (one set is considered "original")
     # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
-    # "optimization_time").
+    # "optimization_time", "optimization_status").
     def search_simultaneously(self, k: int, tau: float, num_alternatives: int,
                               d_name: str = 'dice') -> pd.DataFrame:
         model = AlternativeFeatureSelector.create_model()
@@ -223,19 +224,21 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         end_time = time.process_time()
         # We do not limit the optimization run (e.g., regarding runtime), so it either should have
         # found the optimal solution or there is no solution or there was an error
-        if optimization_status == mip.OptimizationStatus.OPTIMAL:
+        if ((optimization_status == mip.OptimizationStatus.OPTIMAL) or
+                (optimization_status == mip.OptimizationStatus.FEASIBLE)):
             result = pd.DataFrame({
                 'selected_idxs': [[j for (j, s_j) in enumerate(s) if s_j.x] for s in s_list],
                 'train_objective': [Q_s.x for Q_s in self._Q_train_list],
-                'test_objective': [Q_s.x for Q_s in self._Q_test_list],
+                'test_objective': [Q_s.x for Q_s in self._Q_test_list]
             })
         else:
             result = pd.DataFrame({
                 'selected_idxs': [[] for _ in s_list],
                 'train_objective': [float('nan') for _ in self._Q_train_list],
-                'test_objective': [float('nan') for _ in self._Q_test_list],
+                'test_objective': [float('nan') for _ in self._Q_test_list]
             })
         result['optimization_time'] = end_time - start_time
+        result['optimization_status'] = optimization_status
         return result
 
 
@@ -359,11 +362,12 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         start_time = time.process_time()
         optimization_status = model.optimize()  # actually only check constraint satisfcation
         iters = 1  # solver called for first time
-        if optimization_status != mip.OptimizationStatus.OPTIMAL:  # no valid solution exists
+        if ((optimization_status != mip.OptimizationStatus.OPTIMAL) and
+                (optimization_status != mip.OptimizationStatus.FEASIBLE)):  # no valid solution
             result = pd.DataFrame({
                 'selected_idxs': [[] for _ in s_list],
                 'train_objective': [float('nan') for _ in s_list],
-                'test_objective': [float('nan') for _ in s_list],
+                'test_objective': [float('nan') for _ in s_list]
             })
         else:
             s_value_list = [[bool(s_j.x) for s_j in s] for s in s_list]
@@ -377,7 +381,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                                     for (s, s_value) in zip(s_list, s_value_list)]
                 optimization_status = model.optimize()
                 iters = iters + 1
-                if optimization_status == mip.OptimizationStatus.OPTIMAL:
+                if ((optimization_status == mip.OptimizationStatus.OPTIMAL) or
+                        (optimization_status == mip.OptimizationStatus.FEASIBLE)):
                     current_s_value_list = [[bool(s_j.x) for s_j in s] for s in s_list]
                     current_Q_train_list = [prediction.evaluate_wrapper(
                         model=self._prediction_model, X=self._X_train.iloc[:, s_value],
@@ -402,9 +407,10 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                 # on full (without holdout split) training set and predicting on full train + test
                 'test_objective': [prediction.evaluate_wrapper(
                     model=self._prediction_model, X=self._X_test.iloc[:, idxs],
-                    y=self._y_test) for idxs in selected_idxs],
+                    y=self._y_test) for idxs in selected_idxs]
             })
         end_time = time.process_time()
         result['optimization_time'] = end_time - start_time
+        result['optimization_status'] = optimization_status
         result['iters'] = iters
         return result
