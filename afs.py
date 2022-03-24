@@ -390,7 +390,7 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                     if sum(current_Q_train_list) > sum(Q_train_list):
                         s_value_list = current_s_value_list
                         Q_train_list = current_Q_train_list
-                        j = 1
+                        j = 0  # re-start swapping with first feature (zero indexing!)
                     else:
                         j = j + 1
                 else:
