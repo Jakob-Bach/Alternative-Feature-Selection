@@ -35,11 +35,13 @@ def prepare_datasets(data_dir: pathlib.Path) -> None:
     dataset_overview = dataset_overview[
         (dataset_overview['task'] == 'classification') &
         (dataset_overview['n_classes'] == 2) &
-        (dataset_overview['n_features'] >= 15)
+        (dataset_overview['n_instances'] >= 100) &
+        (dataset_overview['n_features'] >= 15) &
+        (dataset_overview['n_features'] <= 200)
     ]  # filtering steps described in paper
     assert pd.Series(DUPLICATE_DATASETS).isin(dataset_overview['dataset']).all()
     dataset_overview = dataset_overview[~dataset_overview['dataset'].isin(DUPLICATE_DATASETS)]
-    assert len(dataset_overview) == 32  # if this changes, we would need to adapt paper as well
+    assert len(dataset_overview) == 30  # if this changes, we would need to adapt paper as well
     dataset_overview.to_csv(data_dir / '_data_overview.csv', index=False)
 
     # Save individual datasets
