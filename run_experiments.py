@@ -118,6 +118,7 @@ def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
         for feature_selector_type in FEATURE_SELECTOR_TYPES]
     process_pool.close()
     process_pool.join()
+    progress_bar.close()
     results = pd.concat([x.get() for x in results])
     data_handling.save_results(results, directory=results_dir)
 
