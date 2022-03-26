@@ -28,12 +28,20 @@ def list_datasets(directory: pathlib.Path) -> Sequence[str]:
     return [file.name.split('_y.')[0] for file in list(directory.glob('*_y.*'))]
 
 
+# Return the path of the file with either complete results or only a particular combi of dataset,
+# fold, and feature selection.
+def get_results_file_path(directory: pathlib.Path, dataset_name: Optional[str] = None,
+                          split_idx: Optional[int] = None, fs_name: Optional[str] = None) -> pathlib.Path:
+    if (dataset_name is not None) and (split_idx is not None) and (fs_name is not None):
+        return directory / (f'{dataset_name}_{split_idx}_{fs_name}_results.csv')
+    return directory / 'results.csv'
+
+
 # Load either complete results or only a particular combi of dataset, fold, and feature selection.
 def load_results(directory: pathlib.Path, dataset_name: Optional[str] = None,
                  split_idx: Optional[int] = None, fs_name: Optional[str] = None) -> pd.DataFrame:
-    if (dataset_name is not None) and (split_idx is not None) and (fs_name is not None):
-        return pd.read_csv(directory / (f'{dataset_name}_{split_idx}_{fs_name}_results.csv'))
-    results_file = directory / 'results.csv'
+    results_file = get_results_file_path(directory=directory, dataset_name=dataset_name,
+                                         split_idx=split_idx, fs_name=fs_name)
     if results_file.exists():
         return pd.read_csv(results_file)
     return pd.concat([pd.read_csv(x) for x in directory.glob('*_results.*')], ignore_index=True)
@@ -41,6 +49,6 @@ def load_results(directory: pathlib.Path, dataset_name: Optional[str] = None,
 
 def save_results(results: pd.DataFrame, directory: pathlib.Path, dataset_name: Optional[str] = None,
                  split_idx: Optional[int] = None,  fs_name: Optional[str] = None) -> None:
-    if (dataset_name is not None) and (split_idx is not None) and (fs_name is not None):
-        results.to_csv(directory / (f'{dataset_name}_{split_idx}_{fs_name}_results.csv'), index=False)
-    results.to_csv(directory / 'results.csv', index=False)
+    results_file = get_results_file_path(directory=directory, dataset_name=dataset_name,
+                                         split_idx=split_idx, fs_name=fs_name)
+    results.to_csv(results_file, index=False)

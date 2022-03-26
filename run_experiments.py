@@ -1,16 +1,18 @@
 """Run experiments
 
 Script to run the full experimental pipeline. Should be run after dataset preparation, as this
-script requires the prediction datasets as inputs. Saves its results for evaluation.
+script requires the prediction datasets as inputs. Saves its results for evaluation. If some
+results already exist, only run the missing experimental settings.
 
 Usage: python -m run_experiments --help
 """
 
 
 import argparse
+import itertools
 import multiprocessing
 import pathlib
-from typing import Optional, Type
+from typing import Any, Dict, Optional, Sequence, Type
 
 import pandas as pd
 import tqdm
@@ -28,6 +30,25 @@ FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.GreedyWrapperSelector, afs.MISel
 K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
 NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search
 NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
+
+
+# Define experimental settings as cross-product of datasets (from "data_dir"), cross-validation
+# folds, and feature-selection methods. Only return those settings for which there is no results
+# file in "results_dir". Provide a dictionary for calling "evaluate_feature_selector()".
+def define_experimental_settings(data_dir: pathlib.Path,
+                                 results_dir: pathlib.Path) -> Sequence[Dict[str, Any]]:
+    experimental_settings = []
+    dataset_names = data_handling.list_datasets(directory=data_dir)
+    for dataset_name, split_idx, feature_selector_type in itertools.product(
+            dataset_names, range(N_FOLDS), FEATURE_SELECTOR_TYPES):
+        results_file = data_handling.get_results_file_path(
+            directory=results_dir, dataset_name=dataset_name, split_idx=split_idx,
+            fs_name=feature_selector_type.__name__)
+        if not results_file.exists():
+            experimental_settings.append(
+                {'dataset_name': dataset_name, 'data_dir': data_dir, 'results_dir': results_dir,
+                 'split_idx': split_idx, 'feature_selector_type': feature_selector_type})
+    return experimental_settings
 
 
 # Evaluate one search for alternatives for one feature selection method (on one split of a dataset).
@@ -105,28 +126,24 @@ def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
         print('Results directory does not exist. We create it.')
         results_dir.mkdir(parents=True)
     if any(results_dir.iterdir()):
-        print('Results directory is not empty. Files might be overwritten, but not deleted.')
-    dataset_names_list = data_handling.list_datasets(directory=data_dir)
-    progress_bar = tqdm.tqdm(total=len(dataset_names_list) * len(FEATURE_SELECTOR_TYPES) * N_FOLDS)
+        print('Results directory is not empty. Only missing experiments will be run.')
+    experimental_settings = define_experimental_settings(data_dir=data_dir, results_dir=results_dir)
+    progress_bar = tqdm.tqdm(total=len(experimental_settings))
     process_pool = multiprocessing.Pool(processes=n_processes)
-    results = [process_pool.apply_async(evaluate_feature_selector, kwds={
-        'dataset_name': dataset_name, 'data_dir': data_dir, 'results_dir': results_dir,
-        'split_idx': split_idx, 'feature_selector_type': feature_selector_type},
-        callback=lambda x: progress_bar.update())
-        for dataset_name in dataset_names_list
-        for split_idx in range(N_FOLDS)
-        for feature_selector_type in FEATURE_SELECTOR_TYPES]
+    results = [process_pool.apply_async(
+        evaluate_feature_selector, kwds=setting, callback=lambda x: progress_bar.update())
+        for setting in experimental_settings]
     process_pool.close()
     process_pool.join()
     progress_bar.close()
-    results = pd.concat([x.get() for x in results])
+    results = data_handling.load_results(directory=results_dir)  # merge individual results files
     data_handling.save_results(results, directory=results_dir)
 
 
 # Parse some command-line arguments and run the main routine.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Runs the complete experimental pipeline. Might take a while.',
+        description='Runs all experiments without results from the complete experimental pipeline.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--data', type=pathlib.Path, default='data/datasets/', dest='data_dir',
                         help='Directory with input data, i.e., datasets in (X, y) form.')
