@@ -11,6 +11,9 @@ import argparse
 import ast
 import pathlib
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 import data_handling
 
 
@@ -29,11 +32,11 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     # Make feature sets proper lists:
     results['selected_idxs'] = results['selected_idxs'].apply(ast.literal_eval)
 
-    print('\n ------ Experimental Design ------')
+    print('\n------ Experimental Design ------')
 
-    print('\n ---- Approaches ----')
+    print('\n---- Approaches ----')
 
-    print('\n -- Feature Selection --')
+    print('\n-- Feature Selection --')
 
     grouping = ['dataset_name', 'split_idx', 'fs_name', 'search_name', 'k', 'tau_abs',
                 'num_alternatives']  # independent search runs
@@ -59,7 +62,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
 
     print('\nHow does median feature-set quality differ between datasets?')
     print(results.groupby('dataset_name')[['train_objective', 'Decision tree_test_mcc']].median(
-        ).round(2))
+        ).describe().round(2))
 
     print('\nHow does median feature-set quality differ between "n" (dataset dimensionality)?')
     print(results.groupby('n')[['train_objective', 'Decision tree_test_mcc']].median().round(2))
@@ -70,6 +73,25 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
 
     print('\nHow does feature set-quality (Spearman-)correlate with "k"/"n"?')
     print(results[quality_metrics].corrwith(results['k'] / results['n'], method='spearman'))
+
+    print('\n---- Prediction Models ----')
+
+    prediction_metrics = [x for x in results.columns if '_mcc' in x]
+    print('\nHow is prediction performance distributed for different models?')
+    print(results[prediction_metrics].describe().round(2).transpose())
+
+    plot_results = results[quality_metrics].corr(method='spearman').round(2)
+    name_mapping = {'train_objective': '$Q_{train}$', 'test_objective': '$Q_{test}$',
+                    'Decision tree_train_mcc': '$MCC_{train}^{Tree}$',
+                    'Decision tree_test_mcc': '$MCC_{test}^{Tree}$',
+                    'Random forest_train_mcc': '$MCC_{train}^{Forest}$',
+                    'Random forest_test_mcc': '$MCC_{test}^{Forest}$'}
+    plot_results.rename(columns=name_mapping, index=name_mapping, inplace=True)
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 14
+    sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'evaluation-metrics-correlation.pdf')
 
 
 # Parse some command-line arguments and run the main routine.
