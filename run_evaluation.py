@@ -31,6 +31,8 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     results = data_handling.load_results(directory=results_dir)
     # Make feature sets proper lists:
     results['selected_idxs'] = results['selected_idxs'].apply(ast.literal_eval)
+    # Rename selectors:
+    results['fs_name'] = results['fs_name'].str.removesuffix('Selector')
 
     print('\n------ Experimental Design ------')
 
@@ -80,6 +82,12 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     print('\nHow is prediction performance distributed for different models?')
     print(results[prediction_metrics].describe().round(2).transpose())
 
+    print('\nWhat\'s the median overfitting (train-test difference)?')
+    results['objective_dif'] = results['train_objective'] - results['test_objective']
+    results['tree_mcc_dif'] = results['Decision tree_train_mcc'] - results['Decision tree_test_mcc']
+    print(results.groupby('fs_name')[['objective_dif', 'tree_mcc_dif']].median().round(2))
+    results.drop(columns=['objective_dif', 'tree_mcc_dif'], inplace=True)
+
     plot_results = results[quality_metrics].corr(method='spearman').round(2)
     name_mapping = {'train_objective': '$Q_{train}$', 'test_objective': '$Q_{test}$',
                     'Decision tree_train_mcc': '$MCC_{train}^{Tree}$',
@@ -92,6 +100,22 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
     plt.tight_layout()
     plt.savefig(plot_dir / 'evaluation-metrics-correlation.pdf')
+
+    print('\n---- Feature-Selection Methods ----')
+
+    print('\nHow does the optimization status differ between feature-selection methods?')
+    print(pd.crosstab(results['optimization_status'], results['fs_name'],
+                      normalize='columns').applymap(lambda x: '{:.2%}'.format(x)))
+
+    print('\nHow does prediction performance differ between feature-selection methods?')
+    for metric in prediction_metrics:
+        print('\nMetric:', metric)
+        print(results.groupby('fs_name')[metric].describe().round(2))
+
+    print('\nHow do the results differ between k?')
+    print(results.groupby('k')[['train_objective', 'Decision tree_test_mcc']].median().round(2))
+    print(results.groupby(['fs_name', 'k'])[['train_objective', 'Decision tree_test_mcc']].median(
+        ).round(2))
 
 
 # Parse some command-line arguments and run the main routine.
