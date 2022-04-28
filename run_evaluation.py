@@ -12,6 +12,7 @@ import ast
 import pathlib
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 
 import data_handling
@@ -112,10 +113,63 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
         print('\nMetric:', metric)
         print(results.groupby('fs_name')[metric].describe().round(2))
 
-    print('\nHow do the results differ between k?')
+    print('\nHow do the results differ between k on median?')
     print(results.groupby('k')[['train_objective', 'Decision tree_test_mcc']].median().round(2))
     print(results.groupby(['fs_name', 'k'])[['train_objective', 'Decision tree_test_mcc']].median(
         ).round(2))
+
+    print('\n---- Searching Alternatives ----')
+
+    print('\n-- Search Method --')
+
+    comparison_results = results[results['search_name'] == 'search_simultaneously']
+    for num_alternatives in results.loc[results['search_name'] == 'search_simultaneously',
+                                        'num_alternatives'].unique():
+        # Extract first "num_alternatives + 1" feature sets (sequential search is only run for one
+        # value of "num_alternatives", but you can get "smaller" results by subsetting)
+        seq_results = results[results['search_name'] == 'search_sequentially'].groupby(
+            grouping).nth(range(0, num_alternatives + 1)).reset_index()
+        seq_results['num_alternatives'] = num_alternatives
+        comparison_results = pd.concat([comparison_results, seq_results])
+
+    print('\nHow does the standard deviation of feature-set quality within results from one search',
+          'depend on search methods and number of alternatives (on median)?')
+    for metric in ['train_objective', 'test_objective', 'Decision tree_test_mcc']:
+        print(comparison_results.groupby(grouping)[metric].std().reset_index().groupby(
+                ['search_name', 'num_alternatives'])[metric].median().reset_index().pivot(
+                    index='num_alternatives', columns='search_name').round(3))
+
+    print('\nHow does the median of feature-set quality within results from one search',
+          'depend on search methods and number of alternatives (on median)?')
+    for metric in ['train_objective', 'test_objective', 'Decision tree_test_mcc']:
+        print(comparison_results.groupby(grouping)[metric].median().reset_index().groupby(
+                ['search_name', 'num_alternatives'])[metric].median().reset_index().pivot(
+                    index='num_alternatives', columns='search_name').round(2))
+
+    print('\nHow is the difference in feature-set quality between simultaneous search and',
+          'sequential search (each comparison for the same search setting) distributed?')
+    for metric in ['train_objective', 'test_objective', 'Decision tree_test_mcc']:
+        reshaped_comparison_results = comparison_results.groupby(grouping)[metric].median(
+            ).reset_index().pivot(index=[x for x in grouping if x != 'search_name'],
+                                  columns='search_name', values=metric)
+        print('\nMetric:', metric)
+        print((reshaped_comparison_results['search_simultaneously'] -
+               reshaped_comparison_results['search_sequentially']).describe().round(2))
+
+    print('\nHow does the optimization status differ between search methods (excluding greedy FS)?')
+    print(pd.crosstab(results.loc[results['fs_name'] != 'GreedyWrapper', 'optimization_status'],
+                      results.loc[results['fs_name'] != 'GreedyWrapper', 'search_name']))
+    print(pd.crosstab(results.loc[results['fs_name'] != 'GreedyWrapper', 'optimization_status'],
+                      results.loc[results['fs_name'] != 'GreedyWrapper', 'search_name'],
+                      normalize='columns').applymap(lambda x: '{:.2%}'.format(x)))
+
+    print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
+          'search (excluding greedy FS)?')
+    print(pd.crosstab(results.loc[(results['search_name'] == 'search_simultaneously') &
+                                  (results['fs_name'] != 'GreedyWrapper'), 'optimization_status'],
+                      results.loc[(results['search_name'] == 'search_simultaneously') &
+                                  (results['fs_name'] != 'GreedyWrapper'), 'num_alternatives'],
+                      normalize='columns').applymap(lambda x: '{:.2%}'.format(x)))
 
 
 # Parse some command-line arguments and run the main routine.
