@@ -56,8 +56,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     print('\n-- Alternatives --')
 
     print('\nHow often do certain optimization statuses occur?')
-    print(results['optimization_status'].value_counts(normalize=True).apply(
-        lambda x: '{:.2%}'.format(x)))
+    print(results['optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
 
     print('\n------ Evaluation ------')
 
@@ -106,7 +105,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
 
     print('\nHow does the optimization status differ between feature-selection methods?')
     print(pd.crosstab(results['optimization_status'], results['fs_name'],
-                      normalize='columns').applymap(lambda x: '{:.2%}'.format(x)))
+                      normalize='columns').applymap('{:.2%}'.format))
 
     print('\nHow does prediction performance differ between feature-selection methods?')
     for metric in prediction_metrics:
@@ -161,7 +160,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                       results.loc[results['fs_name'] != 'GreedyWrapper', 'search_name']))
     print(pd.crosstab(results.loc[results['fs_name'] != 'GreedyWrapper', 'optimization_status'],
                       results.loc[results['fs_name'] != 'GreedyWrapper', 'search_name'],
-                      normalize='columns').applymap(lambda x: '{:.2%}'.format(x)))
+                      normalize='columns').applymap('{:.2%}'.format))
 
     print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
           'search (excluding greedy FS)?')
@@ -169,7 +168,62 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                                   (results['fs_name'] != 'GreedyWrapper'), 'optimization_status'],
                       results.loc[(results['search_name'] == 'search_simultaneously') &
                                   (results['fs_name'] != 'GreedyWrapper'), 'num_alternatives'],
-                      normalize='columns').applymap(lambda x: '{:.2%}'.format(x)))
+                      normalize='columns').applymap('{:.2%}'.format))
+
+    print('\n-- Number of Alternatives --')
+
+    seq_results = results[(results['search_name'] == 'search_sequentially')].copy()
+    seq_results['n_alternative'] = seq_results.groupby(grouping).cumcount()
+    normalization_funcs = {'max': lambda x: x / x.max(),
+                           'min-max': lambda x: (x - x.min()) / (x.max() - x.min())}
+    norm_quality_metrics = ['norm_' + x for x in quality_metrics]
+    for normalization_name, normalization_func in normalization_funcs.items():
+        seq_results[norm_quality_metrics] = seq_results.groupby(grouping)[quality_metrics].apply(
+            normalization_func)
+
+        print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
+              'experimental setting) develop over the iterations of sequential search?')
+        for metric in ['norm_train_objective', 'norm_test_objective', 'norm_Decision tree_test_mcc']:
+            print('\nMetric:', metric)
+            print(seq_results.groupby(['n_alternative', 'fs_name'])[metric].median().reset_index(
+                ).pivot(index='n_alternative', columns='fs_name').round(2))
+
+        plot_results = seq_results[(seq_results['fs_name'] == 'MI')].melt(
+            id_vars=['n_alternative'], value_vars=['norm_train_objective', 'norm_test_objective'],
+            var_name='split', value_name='objective')
+        plot_results['split'] = plot_results['split'].str.replace('(norm_|_objective)', '')
+        plt.figure(figsize=(4, 3))
+        plt.rcParams['font.size'] = 14
+        sns.boxplot(x='n_alternative', y='objective', hue='split', data=plot_results,
+                    palette='Set2', fliersize=0)
+        plt.xlabel('Number of alternative')
+        plt.ylabel('Normalized objective')
+        leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
+                         bbox_to_anchor=(0, -0.1), framealpha=0, ncol=2)
+        leg.get_title().set_position((-115, -20))
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'impact-num-alternatives-objective-{normalization_name}.pdf')
+
+    print('\nHow does the optimization status differ between the number of alternatives in',
+          'sequential search for MI feature selection?')
+    print(pd.crosstab(seq_results.loc[seq_results['fs_name'] == 'MI', 'n_alternative'],
+                      seq_results.loc[seq_results['fs_name'] == 'MI', 'optimization_status'],
+                      normalize='index').applymap('{:.2%}'.format))
+
+    sim_results = results[(results['search_name'] == 'search_simultaneously')].copy()
+    sim_results[quality_metrics] = sim_results.groupby(grouping)[quality_metrics].apply(
+        lambda x: x / x.max())
+
+    print('\nHow does the median train objective (max-normalized per experimental setting) develop',
+          'over the number of alternatives in simultaneous search?')
+    print(sim_results.groupby(['num_alternatives', 'fs_name'])['train_objective'].median(
+        ).reset_index().pivot(index='num_alternatives', columns='fs_name').round(2))
+
+    print('\nHow does the optimization status differ between the number of alternatives in',
+          'simultaneous search for MI feature selection?')
+    print(pd.crosstab(sim_results.loc[sim_results['fs_name'] == 'MI', 'num_alternatives'],
+                      sim_results.loc[sim_results['fs_name'] == 'MI', 'optimization_status'],
+                      normalize='index').applymap('{:.2%}'.format))
 
 
 # Parse some command-line arguments and run the main routine.
