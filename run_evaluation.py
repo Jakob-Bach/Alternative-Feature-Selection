@@ -138,12 +138,41 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                 ['search_name', 'num_alternatives'])[metric].median().reset_index().pivot(
                     index='num_alternatives', columns='search_name').round(3))
 
-    print('\nHow does the median of feature-set quality within results from one search',
+    plt.figure(figsize=(4, 3))
+    plt.rcParams['font.size'] = 14
+    plot_results = comparison_results.groupby(grouping)['train_objective'].std().reset_index()
+    plot_results['search_name'] = plot_results['search_name'].str.replace('search_', '')
+    sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
+                palette='Set2', fliersize=0)
+    plt.xlabel('Number of alternatives')
+    plt.ylabel('Std. dev. of $Q_{train}$')
+    plt.ylim(-0.05, 0.55)
+    leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
+                     bbox_to_anchor=(0, -0.1), framealpha=0, ncol=1)
+    leg.get_title().set_position((-105, -30))
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'impact-search-stddev-objective.pdf')
+
+    print('\nHow does the average of feature-set quality within results from one search',
           'depend on search methods and number of alternatives (on median)?')
     for metric in ['train_objective', 'test_objective', 'Decision tree_test_mcc']:
-        print(comparison_results.groupby(grouping)[metric].median().reset_index().groupby(
-                ['search_name', 'num_alternatives'])[metric].median().reset_index().pivot(
+        print(comparison_results.groupby(grouping)[metric].mean().reset_index().groupby(
+                ['search_name', 'num_alternatives'])[metric].mean().reset_index().pivot(
                     index='num_alternatives', columns='search_name').round(2))
+
+    plt.figure(figsize=(4, 3))
+    plt.rcParams['font.size'] = 14
+    plot_results = comparison_results.groupby(grouping)['train_objective'].mean().reset_index()
+    plot_results['search_name'] = plot_results['search_name'].str.replace('search_', '')
+    sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
+                palette='Set2', fliersize=0)
+    plt.xlabel('Number of alternatives')
+    plt.ylabel('Mean of $Q_{train}$')
+    leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
+                     bbox_to_anchor=(0, -0.1), framealpha=0, ncol=1)
+    leg.get_title().set_position((-105, -30))
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'impact-search-mean-objective.pdf')
 
     print('\nHow is the difference in feature-set quality between simultaneous search and',
           'sequential search (each comparison for the same search setting) distributed?')
