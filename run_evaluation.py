@@ -225,6 +225,72 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                       sim_results.loc[sim_results['fs_name'] == 'MI', 'optimization_status'],
                       normalize='index').applymap('{:.2%}'.format))
 
+    print('\n -- Dissimilarity Threshold "tau"--')
+
+    seq_results[norm_quality_metrics] = seq_results.groupby(grouping)[quality_metrics].apply(
+        normalization_funcs['max'])
+    for split in ['train', 'test']:
+        plot_results = seq_results[(seq_results['fs_name'] == 'MI') & (seq_results['k'] == 10)].groupby(
+            ['n_alternative', 'tau_abs'])[f'norm_{split}_objective'].median().reset_index()
+        plot_results['tau'] = plot_results['tau_abs'] / 10
+        plt.figure(figsize=(4, 3))
+        plt.rcParams['font.size'] = 14
+        sns.lineplot(x='n_alternative', y=f'norm_{split}_objective', hue='tau',
+                     data=plot_results, palette='RdPu', hue_norm=(-0.2, 1), legend=False)
+        cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(
+            cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
+        cbar.ax.invert_yaxis()  # put low values at top (like the lines are mainly ordered)
+        cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
+        plt.xlabel('Number of alternative')
+        plt.ylabel('Normalized objective')
+        plt.xticks(range(0, 11, 2))
+        plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        plt.ylim(-0.05, 1.05)
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'impact-num-alternatives-{split}-objective-tau.pdf')
+
+    print('\nHow does the median feature-set quality (max-normalized per experimental setting)',
+          'develop over the iterations and "tau" of sequential search for MI and k=10?')
+    for metric in ['norm_train_objective', 'norm_test_objective', 'norm_Decision tree_test_mcc']:
+        print(seq_results[(seq_results['fs_name'] == 'MI') & (seq_results['k'] == 10)].groupby(
+            ['n_alternative', 'tau_abs'])[metric].median().reset_index(
+            ).pivot(index='n_alternative', columns='tau_abs').round(2))
+
+    print('\nHow does the optimization status differ between the dissimilarity thresholds in',
+          'sequential search for MI feature selection?')
+    print(pd.crosstab(seq_results.loc[(seq_results['fs_name'] == 'MI') & (seq_results['k'] == 10),
+                                      'tau_abs'],
+                      seq_results.loc[(seq_results['fs_name'] == 'MI') & (seq_results['k'] == 10),
+                                      'optimization_status'],
+                      normalize='index').applymap('{:.2%}'.format))
+
+    print('\nHow does the median feature-set quality (max-normalized per experimental setting)',
+          'develop over "tau" for different feature selectors in sequential search (k=10)?')
+    for metric in ['norm_train_objective', 'norm_test_objective', 'norm_Decision tree_test_mcc']:
+        print(seq_results[seq_results['k'] == 10].groupby(['tau_abs', 'fs_name'])[metric].median(
+            ).reset_index().pivot(index='tau_abs', columns='fs_name').round(2))
+
+    print('\nHow does the train objective (max-normalized per experimental setting) develop over',
+          '"tau" in simultaneous search for MI feature selection?')
+    print(sim_results[sim_results['k'] == 10].groupby(
+        ['tau_abs', 'fs_name'])['train_objective'].mean().reset_index().pivot(
+            index='tau_abs', columns='fs_name').round(2))
+
+    print('How many new features occur in a feature set from one alternative to next in sequential',
+          'search for MI as feature selector?')
+    feature_diff_results = seq_results.copy()
+    feature_diff_results['prev_selected_idxs'] = feature_diff_results.groupby(
+        grouping)['selected_idxs'].shift().fillna('').apply(list)
+    feature_diff_results['features_added'] = feature_diff_results.apply(
+        lambda x: len(set(x['selected_idxs']) - set(x['prev_selected_idxs'])), axis='columns')
+    feature_diff_results['features_deleted'] = feature_diff_results.apply(
+        lambda x: len(set(x['prev_selected_idxs']) - set(x['selected_idxs'])), axis='columns')
+    print(feature_diff_results[
+        (feature_diff_results['train_objective'].notna()) &  # current feature set not empty
+        (feature_diff_results['n_alternative'] > 0) &  # previous feature set exists
+        (feature_diff_results['fs_name'] == 'MI')].groupby(
+            'tau_abs')['features_added'].describe().round(2))
+
 
 # Parse some command-line arguments and run the main routine.
 if __name__ == '__main__':
