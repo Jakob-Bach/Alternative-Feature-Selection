@@ -18,6 +18,9 @@ import seaborn as sns
 import data_handling
 
 
+plt.rcParams['font.family'] = 'Helvetica'  # IEEE template's sans-serif font
+
+
 # Main-routine: run complete evaluation pipeline. To that end, read results from the "results_dir"
 # and save plots to the "plot_dir". Prints some statistics to the console.
 def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
@@ -139,7 +142,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                     index='num_alternatives', columns='search_name').round(3))
 
     plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 14
+    plt.rcParams['font.size'] = 11
     plot_results = comparison_results.groupby(grouping)['train_objective'].std().reset_index()
     plot_results['search_name'] = plot_results['search_name'].str.replace('search_', '')
     sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
@@ -149,7 +152,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     plt.ylim(-0.05, 0.55)
     leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
                      bbox_to_anchor=(0, -0.1), framealpha=0, ncol=1)
-    leg.get_title().set_position((-105, -30))
+    leg.get_title().set_position((-80, -24))
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-stddev-objective.pdf')
 
@@ -161,7 +164,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                     index='num_alternatives', columns='search_name').round(2))
 
     plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 14
+    plt.rcParams['font.size'] = 11
     plot_results = comparison_results.groupby(grouping)['train_objective'].mean().reset_index()
     plot_results['search_name'] = plot_results['search_name'].str.replace('search_', '')
     sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
@@ -170,7 +173,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     plt.ylabel('Mean of $Q_{train}$')
     leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
                      bbox_to_anchor=(0, -0.1), framealpha=0, ncol=1)
-    leg.get_title().set_position((-105, -30))
+    leg.get_title().set_position((-80, -24))
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-mean-objective.pdf')
 
@@ -222,14 +225,14 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
             var_name='split', value_name='objective')
         plot_results['split'] = plot_results['split'].str.replace('(norm_|_objective)', '')
         plt.figure(figsize=(4, 3))
-        plt.rcParams['font.size'] = 14
+        plt.rcParams['font.size'] = 11
         sns.boxplot(x='n_alternative', y='objective', hue='split', data=plot_results,
                     palette='Set2', fliersize=0)
         plt.xlabel('Number of alternative')
         plt.ylabel('Normalized objective')
         leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
                          bbox_to_anchor=(0, -0.1), framealpha=0, ncol=2)
-        leg.get_title().set_position((-115, -20))
+        leg.get_title().set_position((-90, -15))
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-num-alternatives-objective-{normalization_name}.pdf')
 
@@ -263,7 +266,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
             ['n_alternative', 'tau_abs'])[f'norm_{split}_objective'].median().reset_index()
         plot_results['tau'] = plot_results['tau_abs'] / 10
         plt.figure(figsize=(4, 3))
-        plt.rcParams['font.size'] = 14
+        plt.rcParams['font.size'] = 11
         sns.lineplot(x='n_alternative', y=f'norm_{split}_objective', hue='tau',
                      data=plot_results, palette='RdPu', hue_norm=(-0.2, 1), legend=False)
         cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(
