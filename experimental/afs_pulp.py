@@ -39,7 +39,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         self._y_train = None  # pd.Series
         self._y_test = None  # pd.Series
         self._n = None  # int; total number of features
-        self._solver = pulp.PULP_CBC_CMD(msg=False, threads=1)
+        self._solver = pulp.PULP_CBC_CMD(msg=False, threads=1, timeLimit=60)
 
     # Set the data that will be used during search for alternative feature sets. You can override
     # this method if you want to pre-compute some stuff for feature-selection (so these computations
@@ -221,9 +221,9 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         start_time = time.perf_counter()
         problem.solve(solver=self._solver)
         end_time = time.perf_counter()
-        # We do not limit the optimization run (e.g., regarding runtime), so it either should have
-        # found the optimal solution or there is no solution or there was an error
-        if problem.status == pulp.const.LpStatusOptimal:
+        # As we limit the optimization time, the result might be feasible but suboptimal
+        if ((problem.sol_status == pulp.const.LpSolutionOptimal) or
+                (problem.sol_status == pulp.const.LpSolutionIntegerFeasible)):
             result = pd.DataFrame({
                 'selected_idxs': [[j for (j, s_j) in enumerate(s) if round(s_j.value())]
                                   for s in s_list],
@@ -237,7 +237,7 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
                 'test_objective': [float('nan') for _ in self._Q_test_list]
             })
         result['optimization_time'] = end_time - start_time
-        result['optimization_status'] = problem.status
+        result['optimization_status'] = problem.sol_status
         return result
 
 
@@ -363,7 +363,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         start_time = time.perf_counter()
         problem.solve(solver=self._solver)
         iters = 1  # solver called for first time
-        if problem.status != pulp.const.LpStatusOptimal:  # no valid solution
+        if ((problem.sol_status != pulp.const.LpSolutionOptimal) and
+                (problem.sol_status != pulp.const.LpSolutionIntegerFeasible)):  # no valid solution
             result = pd.DataFrame({
                 'selected_idxs': [[] for _ in s_list],
                 'train_objective': [float('nan') for _ in s_list],
@@ -382,7 +383,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                     problem.addConstraint(s[j] == 0 if s_value[j] else s[j] == 1, name=f'swap_{i}')
                 problem.solve(solver=self._solver)
                 iters = iters + 1
-                if problem.status == pulp.const.LpStatusOptimal:
+                if ((problem.sol_status == pulp.const.LpSolutionOptimal) or
+                        (problem.sol_status == pulp.const.LpSolutionIntegerFeasible)):
                     current_s_value_list = [[bool(round(s_j.value())) for s_j in s] for s in s_list]
                     current_Q_train_list = [prediction.evaluate_wrapper(
                         model=self._prediction_model, X=self._X_train.iloc[:, s_value],
@@ -413,6 +415,6 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
             })
         end_time = time.perf_counter()
         result['optimization_time'] = end_time - start_time
-        result['optimization_status'] = problem.status
+        result['optimization_status'] = problem.sol_status
         result['iters'] = iters
         return result
