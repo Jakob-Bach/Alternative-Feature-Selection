@@ -99,7 +99,7 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                     'Random forest_test_mcc': '$MCC_{test}^{Forest}$'}
     plot_results.rename(columns=name_mapping, index=name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 14
+    plt.rcParams['font.size'] = 16
     sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
     plt.tight_layout()
     plt.savefig(plot_dir / 'evaluation-metrics-correlation.pdf')
@@ -141,18 +141,19 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                 ['search_name', 'num_alternatives'])[metric].median().reset_index().pivot(
                     index='num_alternatives', columns='search_name').round(3))
 
-    plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 11
+    plt.figure(figsize=(6, 3))
+    plt.rcParams['font.size'] = 14
     plot_results = comparison_results.groupby(grouping)['train_objective'].std().reset_index()
     plot_results['search_name'] = plot_results['search_name'].str.replace('search_', '')
     sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
                 palette='Set2', fliersize=0)
     plt.xlabel('Number of alternatives')
     plt.ylabel('Std. dev. of $Q_{train}$')
+    plt.yticks([0, 0.1, 0.2, 0.3, 0.4, 0.5])
     plt.ylim(-0.05, 0.55)
     leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
-                     bbox_to_anchor=(0, -0.1), framealpha=0, ncol=1)
-    leg.get_title().set_position((-80, -24))
+                     bbox_to_anchor=(0, -0.1), framealpha=0, ncol=2)
+    leg.get_title().set_position((-180, -20))
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-stddev-objective.pdf')
 
@@ -163,17 +164,18 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
                 ['search_name', 'num_alternatives'])[metric].mean().reset_index().pivot(
                     index='num_alternatives', columns='search_name').round(2))
 
-    plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 11
+    plt.figure(figsize=(6, 3))
+    plt.rcParams['font.size'] = 14
     plot_results = comparison_results.groupby(grouping)['train_objective'].mean().reset_index()
     plot_results['search_name'] = plot_results['search_name'].str.replace('search_', '')
     sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
                 palette='Set2', fliersize=0)
     plt.xlabel('Number of alternatives')
     plt.ylabel('Mean of $Q_{train}$')
+    plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
     leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
-                     bbox_to_anchor=(0, -0.1), framealpha=0, ncol=1)
-    leg.get_title().set_position((-80, -24))
+                     bbox_to_anchor=(0, -0.1), framealpha=0, ncol=2)
+    leg.get_title().set_position((-180, -20))
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-mean-objective.pdf')
 
@@ -224,15 +226,16 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
             id_vars=['n_alternative'], value_vars=['norm_train_objective', 'norm_test_objective'],
             var_name='split', value_name='objective')
         plot_results['split'] = plot_results['split'].str.replace('(norm_|_objective)', '')
-        plt.figure(figsize=(4, 3))
-        plt.rcParams['font.size'] = 11
+        plt.figure(figsize=(6, 3))
+        plt.rcParams['font.size'] = 14
         sns.boxplot(x='n_alternative', y='objective', hue='split', data=plot_results,
                     palette='Set2', fliersize=0)
         plt.xlabel('Number of alternative')
         plt.ylabel('Normalized objective')
+        plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
                          bbox_to_anchor=(0, -0.1), framealpha=0, ncol=2)
-        leg.get_title().set_position((-90, -15))
+        leg.get_title().set_position((-120, -20))
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-num-alternatives-objective-{normalization_name}.pdf')
 
@@ -265,8 +268,8 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
         plot_results = seq_results[(seq_results['fs_name'] == 'MI') & (seq_results['k'] == 10)].groupby(
             ['n_alternative', 'tau_abs'])[f'norm_{split}_objective'].median().reset_index()
         plot_results['tau'] = plot_results['tau_abs'] / 10
-        plt.figure(figsize=(4, 3))
-        plt.rcParams['font.size'] = 11
+        plt.figure(figsize=(6, 3))
+        plt.rcParams['font.size'] = 14
         sns.lineplot(x='n_alternative', y=f'norm_{split}_objective', hue='tau',
                      data=plot_results, palette='RdPu', hue_norm=(-0.2, 1), legend=False)
         cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(
