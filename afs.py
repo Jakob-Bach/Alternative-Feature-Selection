@@ -11,7 +11,7 @@ import math
 import time
 from typing import Iterable, Optional, Union, Sequence, Tuple
 
-import mip
+from ortools.linear_solver import pywraplp
 import numpy as np
 import pandas as pd
 import sklearn.base
@@ -55,71 +55,70 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     def get_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         return self._X_train, self._X_test, self._y_train, self._y_test
 
-    # Return a fresh "mip" model in which the constraints for alternatives will be stored. Do some
+    # Return a fresh solver in which the constraints for alternatives will be stored. Do some
     # initialization that is independent from the feature-selection method used (while
-    # "initialize_model()" is feature-selection-specific). This routine will be called at the
+    # "initialize_solver()" is feature-selection-specific). This routine will be called at the
     # beginning of the search for alternative feature sets.
     @staticmethod
-    def create_model() -> mip.Model:
-        model = mip.Model(sense=mip.MAXIMIZE)
-        model.verbose = 0
-        model.threads = 1
-        model.seed = 25
-        model.max_seconds = 60  # optimization timeout; solver might still find feasible solution
-        return model
+    def create_solver() -> pywraplp.Solver:
+        solver = pywraplp.Solver.CreateSolver('CBC')
+        solver.SetNumThreads(1)
+        solver.SetTimeLimit(60000)  # timeout in ms; solver might still find feasible solution
+        return solver
 
-    # Initialize a "mip" model for alternative feature sets specific to the feature-selection method
+    # Initialize a solver for alternative feature sets specific to the feature-selection method
     # used, e.g., add an objective or constraints (if the feature-selection method has these).
     # This routine will be called at the  beginning of the search for alternative feature sets.
-    # -"model": The "mip" model that will hold the constraints for alternatives.
+    # - "solver": The solver that will hold the constraints for alternatives.
     # - "s_list": The feature-selection decision variables. For sequential search, len(s_list) == 1,
     #   while simultaneous search considers multiple feature sets at once. For each feature sets,
     #   there should be as many decision variables as there are features in the dataset.
     @abstractmethod
-    def initialize_model(self, model: mip.Model, s_list: Sequence[Sequence[mip.Var]]) -> None:
+    def initialize_solver(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
         raise NotImplementedError('Abstract method.')
 
     # Feature-selection method that is used (as subroutine) in the search for alternatives.
-    # See "initialize_model()" for a description of the parameters.
+    # See "initialize_solver()" for a description of the parameters.
     # Should returns a table of results, where each row is a feature set (column "selected_idxs",
     # type "Sequence[int]") accompanied by metrics (columns: "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
     @abstractmethod
-    def select_and_evaluate(self, model: mip.Model,
-                            s_list: Sequence[Sequence[mip.Var]]) -> pd.DataFrame:
+    def select_and_evaluate(self, solver: pywraplp.Solver,
+                            s_list: Sequence[Sequence[pywraplp.Variable]]) -> pd.DataFrame:
         raise NotImplementedError('Abstract method.')
 
-    # Return a variable for the product between two binary variables from the same "mip" model.
+    # Return a variable for the product between two binary variables from the same "solver".
     # Add the necessary constraints to make sure the new variable really represents the product.
     # See https://docs.mosek.com/modeling-cookbook/mio.html#boolean-operators ("AND" operator)
     @staticmethod
-    def create_product_var(var1: mip.Var, var2: mip.Var) -> mip.Var:
-        assert var1.model is var2.model, 'Both variables need to have same model.'
-        model = var1.model
-        var_name = var1.name + '*' + var2.name
-        var = model.add_var(name=var_name, var_type=mip.BINARY)
-        model.add_constr(var <= var1)
-        model.add_constr(var <= var2)
-        model.add_constr(1 + var >= var1 + var2)
+    def create_product_var(solver: pywraplp.Solver, var1: pywraplp.Variable,
+                           var2: pywraplp.Variable) -> pywraplp.Variable:
+        var_name = var1.name() + '*' + var2.name()
+        var = solver.BoolVar(name=var_name)
+        solver.Add(var <= var1)
+        solver.Add(var <= var2)
+        solver.Add(1 + var >= var1 + var2)
         return var
 
     # Return a constraint such that the dissimilarity between two feature sets of desired size "k"
     # is over a threshold "tau". The selection decisions "s2" for the 2nd feature set are unknown
-    # (thus, they are "mip" variables), while the decisions "s1" for the first feature set can be
-    # either unknown ("mip" variables) or known (vector of 0/1 or false/true).
+    # (thus, they are variables), while the decisions "s1" for the first feature set can be
+    # either unknown (variables) or known (vector of 0/1 or false/true).
     # Currently supported for "d_name" are "dice" and "jaccard". For "dice", you can also provide
     # an absolute number of differing features "tau_abs" instead of a relative "tau" from [0, 1].
     @staticmethod
     def create_pairwise_alternative_constraint(
-            s1: Sequence[Union[mip.Var, int, bool]], s2: Sequence[mip.Var], k: int,
-            tau: Optional[float] = None, tau_abs: Optional[int] = None, d_name: str = 'dice') -> mip.LinExpr:
+            solver: pywraplp.Solver, s1: Sequence[Union[pywraplp.Variable, int, bool]],
+            s2: Sequence[pywraplp.Variable], k: int, tau: Optional[float] = None,
+            tau_abs: Optional[int] = None, d_name: str = 'dice') -> pywraplp.LinearConstraint:
         assert len(s1) == len(s2), 'Decision vectors s1 and s2 need to have same length.'
-        assert isinstance(s2[0], mip.Var), 's2 needs to contain variables, only s1 might be fixed.'
-        if isinstance(s1[0], mip.Var):  # both features sets undetermined
-            overlap_size = mip.xsum(AlternativeFeatureSelector.create_product_var(s1_j, s2_j)
-                                    for (s1_j, s2_j) in zip(s1, s2))
+        assert isinstance(s2[0], pywraplp.Variable), 's2 needs to contain variables.'
+        if isinstance(s1[0], pywraplp.Variable):  # both feature sets undetermined
+            overlap_size = solver.Sum([AlternativeFeatureSelector.create_product_var(
+                solver=solver, var1=s1_j, var2=s2_j) for (s1_j, s2_j) in zip(s1, s2)])
         else:  # one feature set known, so plain sum
-            overlap_size = mip.xsum(s2_j for (s1_j, s2_j) in zip(s1, s2) if s1_j)
+            overlap_size = solver.Sum([s2_j for (s1_j, s2_j) in zip(s1, s2) if s1_j])
         if d_name == 'dice':  # as same size of both sets, also equivalent to some other measures
             if tau_abs is not None:
                 return overlap_size <= k - tau_abs
@@ -140,19 +139,19 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     def search_sequentially(self, k: int, num_alternatives: int, tau: Optional[float] = None,
                             tau_abs: Optional[int] = None, d_name: str = 'dice') -> pd.DataFrame:
         results = []
-        model = AlternativeFeatureSelector.create_model()
-        s = [model.add_var(name=f's_{j}', var_type=mip.BINARY) for j in range(self._n)]
+        solver = AlternativeFeatureSelector.create_solver()
+        s = [solver.BoolVar(name=f's_{j}') for j in range(self._n)]
         s_list = [s]  # only search for one feature set at a time
-        model.add_constr(mip.xsum(s) == k)  # select exactly k
-        self.initialize_model(model=model, s_list=s_list)
-        results.append(self.select_and_evaluate(model=model, s_list=s_list))  # "original" set
+        solver.Add(solver.Sum(s) == k)  # select exactly k
+        self.initialize_solver(solver=solver, s_list=s_list)
+        results.append(self.select_and_evaluate(solver=solver, s_list=s_list))  # "original" set
         for _ in range(num_alternatives):
             if not math.isnan(results[-1]['train_objective'].iloc[0]):  # if not infeasible
                 s_value = [j in results[-1]['selected_idxs'].iloc[0] for j in range(self._n)]
                 # Feature set different to previous selection:
-                model.add_constr(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
-                    s1=s_value, s2=s, k=k, tau=tau, tau_abs=tau_abs, d_name=d_name))
-            results.append(self.select_and_evaluate(model=model, s_list=s_list))
+                solver.Add(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
+                    solver=solver, s1=s_value, s2=s, k=k, tau=tau, tau_abs=tau_abs, d_name=d_name))
+            results.append(self.select_and_evaluate(solver=solver, s_list=s_list))
         return pd.concat(results, ignore_index=True)
 
     # Simultaneously search for alternative feature sets, only generating constraints once and then
@@ -166,17 +165,17 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # "optimization_time", "optimization_status").
     def search_simultaneously(self, k: int, num_alternatives: int, tau: Optional[float] = None,
                               tau_abs: Optional[int] = None, d_name: str = 'dice') -> pd.DataFrame:
-        model = AlternativeFeatureSelector.create_model()
+        solver = AlternativeFeatureSelector.create_solver()
         s_list = []
         for i in range(num_alternatives + 1):  # find "num_alternatives" + 1 feature sets
-            s = [model.add_var(name=f's{i}_{j}', var_type=mip.BINARY) for j in range(self._n)]
-            model.add_constr(mip.xsum(s) == k)
+            s = [solver.BoolVar(name=f's{i}_{j}') for j in range(self._n)]
+            solver.Add(solver.Sum(s) == k)
             for s2 in s_list:
-                model.add_constr(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
-                    s1=s, s2=s2, k=k, tau=tau, tau_abs=tau_abs, d_name=d_name))
+                solver.Add(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
+                    solver=solver, s1=s, s2=s2, k=k, tau=tau, tau_abs=tau_abs, d_name=d_name))
             s_list.append(s)
-        self.initialize_model(model=model, s_list=s_list)
-        return self.select_and_evaluate(model=model, s_list=s_list)
+        self.initialize_solver(solver=solver, s_list=s_list)
+        return self.select_and_evaluate(solver=solver, s_list=s_list)
 
 
 class LinearQualityFeatureSelector(AlternativeFeatureSelector):
@@ -193,8 +192,8 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         super().__init__()
         self._q_train = None  # Iterable[float]; qualities of the individual features
         self._q_test = None  # Iterable[float]; for evaluation only, not optimization
-        self._Q_train_list = None  # Sequence[mip.LinExpr]; objectives for the feature sets
-        self._Q_test_list = None  # Sequence[mip.LinExpr]; for evaluation only, not optimization
+        self._Q_train_list = None  # Sequence[pywraplp.LinearExpr]; objectives for the feature sets
+        self._Q_test_list = None  # Sequence[pywraplp.LinearExpr]; for evaluation, not optimization
 
     # Should return a sequence of qualities with len(result) == X.shape[1], i.e., one quality value
     # for each feature.
@@ -210,31 +209,32 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         self._q_train = self.compute_qualities(X=X_train, y=y_train)
         self._q_test = self.compute_qualities(X=X_test, y=y_test)
 
-    # Initialize the "mip" model by creating linear objectives from the features' qualities.
+    # Initialize the "solver" by creating linear objectives from the features' qualities.
     # See the superclass for a description of the parameters.
-    def initialize_model(self, model: mip.Model, s_list: Sequence[Sequence[mip.Var]]) -> None:
-        self._Q_train_list = [mip.xsum(q_j * s_j for (q_j, s_j) in zip(self._q_train, s))
+    def initialize_solver(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
+        self._Q_train_list = [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_train, s)])
                               for s in s_list]
-        self._Q_test_list = [mip.xsum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s))
+        self._Q_test_list = [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_test, s)])
                              for s in s_list]
-        model.objective = mip.xsum(self._Q_train_list)  # sum over all feature sets
+        objective = solver.Sum(self._Q_train_list)  # sum over all feature sets
+        solver.Maximize(objective)
 
-    # Run feature-selection on the "model." As this class represents a white-box objective, we can
-    # directly run the optimization routine of the "model".
+    # Run feature-selection with the solver. As this class represents a white-box objective, we can
+    # directly run the optimization routine of the "solver".
     # See the superclass for a description of the parameters and the return value.
-    def select_and_evaluate(self, model: mip.Model,
-                            s_list: Sequence[Sequence[mip.Var]]) -> pd.DataFrame:
+    def select_and_evaluate(self, solver: pywraplp.Solver,
+                            s_list: Sequence[Sequence[pywraplp.Variable]]) -> pd.DataFrame:
         start_time = time.process_time()
-        optimization_status = model.optimize()
+        optimization_status = solver.Solve()
         end_time = time.process_time()
-        # We do not limit the optimization run (e.g., regarding runtime), so it either should have
-        # found the optimal solution or there is no solution or there was an error
-        if ((optimization_status == mip.OptimizationStatus.OPTIMAL) or
-                (optimization_status == mip.OptimizationStatus.FEASIBLE)):
+        # As we limit the optimization time, the result might be feasible but suboptimal:
+        if optimization_status in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
             result = pd.DataFrame({
-                'selected_idxs': [[j for (j, s_j) in enumerate(s) if s_j.x] for s in s_list],
-                'train_objective': [Q_s.x for Q_s in self._Q_train_list],
-                'test_objective': [Q_s.x for Q_s in self._Q_test_list]
+                'selected_idxs': [[j for (j, s_j) in enumerate(s) if s_j.solution_value()]
+                                  for s in s_list],
+                'train_objective': [Q_s.solution_value() for Q_s in self._Q_train_list],
+                'test_objective': [Q_s.solution_value() for Q_s in self._Q_test_list]
             })
         else:
             result = pd.DataFrame({
@@ -243,7 +243,7 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
                 'test_objective': [float('nan') for _ in self._Q_test_list]
             })
         result['optimization_time'] = end_time - start_time
-        result['optimization_status'] = optimization_status.name
+        result['optimization_status'] = optimization_status
         return result
 
 
@@ -293,11 +293,12 @@ class FCBFSelector(MISelector):
         self._mi_features = [MISelector.mutual_info(X=self._X_train, y=self._X_train[feature])
                              for feature in self._X_train.columns]
 
-    # Initialize the "mip" model by creating linear objectives from the features' qualities and
+    # Initialize the "solver" by creating linear objectives from the features' qualities and
     # adding constraints on the feature-feature depencies.
     # See the superclass for a description of the parameters.
-    def initialize_model(self, model: mip.Model, s_list: Sequence[Sequence[mip.Var]]) -> None:
-        super().initialize_model(model=model, s_list=s_list)
+    def initialize_solver(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
+        super().initialize_solver(solver=solver, s_list=s_list)
         # Note that the MI estimator in sklearn is not perfectly bivariate and symmetric, as it uses
         # *one* random-number generator to *iteratively* add some noise to *all* features and
         # target; e.g., if you re-order features in X, MI estimates change slightly, though the
@@ -308,7 +309,7 @@ class FCBFSelector(MISelector):
                 if ((self._mi_target[j_1] <= self._mi_features[j_1][j_2]) or
                         (self._mi_target[j_2] <= self._mi_features[j_2][j_1])):
                     for s in s_list:
-                        model.add_constr(s[j_1] + s[j_2] <= 1)
+                        solver.Add(s[j_1] + s[j_2] <= 1)
 
 
 class ModelImportanceSelector(LinearQualityFeatureSelector):
@@ -353,8 +354,10 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
     # Set a constant objective, as the solver should only check validity of solutions in this
     # approach (the actual objective, i.e., prediction performance, is a black-box).
     # See the superclass for a description of the parameters.
-    def initialize_model(self, model: mip.Model, s_list: Sequence[Sequence[mip.Var]]) -> None:
-        model.objective = 0
+    def initialize_solver(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
+        objective = 0
+        solver.Maximize(objective)
 
     # Run a greedy hill-climbing procedure to select features. In particular, start with a feature
     # set satisfying all constraints and systematically try flipping the selection decisions of
@@ -362,33 +365,35 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
     # best one. Use a prediction model to evaluate qualities of the feature sets. Stop after a fixed
     # number of iterations (= solver calls) or if no new valid feature set can be generated.
     # See the superclass for a description of the parameters and the return value.
-    def select_and_evaluate(self, model: mip.Model,
-                            s_list: Sequence[Sequence[mip.Var]]) -> pd.DataFrame:
+    def select_and_evaluate(self, solver: pywraplp.Solver,
+                            s_list: Sequence[Sequence[pywraplp.Variable]]) -> pd.DataFrame:
         start_time = time.process_time()
-        optimization_status = model.optimize()  # actually only check constraint satisfcation
+        optimization_status = solver.Solve()  # actually only check constraint satisfcation
         iters = 1  # solver called for first time
-        if ((optimization_status != mip.OptimizationStatus.OPTIMAL) and
-                (optimization_status != mip.OptimizationStatus.FEASIBLE)):  # no valid solution
+        if optimization_status not in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
             result = pd.DataFrame({
                 'selected_idxs': [[] for _ in s_list],
                 'train_objective': [float('nan') for _ in s_list],
                 'test_objective': [float('nan') for _ in s_list]
             })
         else:
-            s_value_list = [[bool(s_j.x) for s_j in s] for s in s_list]
+            s_value_list = [[bool(s_j.solution_value()) for s_j in s] for s in s_list]
             # Note that "training" quality actually is validation performance with a holdout split
             Q_train_list = [prediction.evaluate_wrapper(
                 model=self._prediction_model, X=self._X_train.iloc[:, s_value], y=self._y_train)
                 for s_value in s_value_list]
             j = 0  # other than pseudo-code in paper, 0-indexing here
+            swap_variables = []
             while (iters < self._max_iters) and (j < self._n):
-                swap_constraints = [model.add_constr(s[j] == 0 if s_value[j] else s[j] == 1)
-                                    for (s, s_value) in zip(s_list, s_value_list)]
-                optimization_status = model.optimize()
+                # We can't add temporary constraints (no remove function), but we can fix variables
+                for s, s_value in zip(s_list, s_value_list):  # fix s_j to inverse of previous value
+                    s[j].SetBounds(1 - s_value[j], 1 - s_value[j])
+                    swap_variables.append(s[j])
+                optimization_status = solver.Solve()
                 iters = iters + 1
-                if ((optimization_status == mip.OptimizationStatus.OPTIMAL) or
-                        (optimization_status == mip.OptimizationStatus.FEASIBLE)):
-                    current_s_value_list = [[bool(s_j.x) for s_j in s] for s in s_list]
+                if optimization_status in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
+                    current_s_value_list = [[bool(s_j.solution_value()) for s_j in s]
+                                            for s in s_list]
                     current_Q_train_list = [prediction.evaluate_wrapper(
                         model=self._prediction_model, X=self._X_train.iloc[:, s_value],
                         y=self._y_train) for s_value in current_s_value_list]
@@ -400,7 +405,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                         j = j + 1
                 else:
                     j = j + 1
-                model.remove(swap_constraints)
+                for s_j in swap_variables:
+                    s_j.SetBounds(0, 1)  # revert fixing to one value (make regular binary again)
             selected_idxs = [[j for (j, s_j_value) in enumerate(s_value) if s_j_value]
                              for s_value in s_value_list]
             result = pd.DataFrame({
@@ -416,6 +422,6 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
             })
         end_time = time.process_time()
         result['optimization_time'] = end_time - start_time
-        result['optimization_status'] = optimization_status.name
+        result['optimization_status'] = optimization_status
         result['iters'] = iters
         return result

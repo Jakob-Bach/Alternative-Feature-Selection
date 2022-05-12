@@ -37,24 +37,19 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     results['selected_idxs'] = results['selected_idxs'].apply(ast.literal_eval)
     # Rename selectors:
     results['fs_name'] = results['fs_name'].str.removesuffix('Selector')
+    # Rename optimization statuses:
+    results['optimization_status'].replace({0: 'Optimal', 1: 'Feasible', 2: 'Infeasible',
+                                            6: 'Not solved'}, inplace=True)
+    # Sanity check: correct number of feature selected
+    assert ((results['train_objective'].isna() & (results['selected_idxs'].apply(len) == 0)) |
+            (results['selected_idxs'].apply(len) == results['k'])).all()
+    # Define main experimental dimensions (independent search runs):
+    grouping = ['dataset_name', 'split_idx', 'fs_name', 'search_name', 'k', 'tau_abs',
+                'num_alternatives']
 
     print('\n------ Experimental Design ------')
 
     print('\n---- Approaches ----')
-
-    print('\n-- Feature Selection --')
-
-    grouping = ['dataset_name', 'split_idx', 'fs_name', 'search_name', 'k', 'tau_abs',
-                'num_alternatives']  # independent search runs
-    results['real_k'] = results['selected_idxs'].apply(len)
-    results['is_faulty'] = results['train_objective'].notna() & (results['k'] != results['real_k'])
-    is_search_faulty = results.groupby(grouping)['is_faulty'].any()
-    print('\n{:.2%}'.format(results['is_faulty'].sum() / len(results)),
-          'feature sets violate the prescribed k.')
-    print('{:.2%}'.format(is_search_faulty.sum() / len(is_search_faulty)),
-          'of the searches for alternatives are affected.')
-    results = results.groupby(grouping).filter(lambda x: ~x['is_faulty'].any())
-    results.drop(columns=['real_k', 'is_faulty'], inplace=True)
 
     print('\n-- Alternatives --')
 

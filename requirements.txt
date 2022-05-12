@@ -1,3 +1,4 @@
+absl-py==1.0.0
 certifi==2021.10.8
 cffi==1.15.0
 charset-normalizer==2.0.12
@@ -8,12 +9,13 @@ idna==3.3
 joblib==1.1.0
 kiwisolver==1.3.2
 matplotlib==3.5.1
-mip==1.13.0
 numpy==1.22.3
+ortools==9.3.10497
 packaging==21.3
 pandas==1.4.1
 Pillow==9.0.1
 pmlb==1.0.1.post3
+protobuf==3.20.1
 pycparser==2.21
 pyparsing==3.0.7
 python-dateutil==2.8.2
