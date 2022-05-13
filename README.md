@@ -8,7 +8,46 @@ This repository contains the code of the paper
 Once it's published, we'll add a link to it here.
 We'll link the experimental data, too.)
 
-This document describes the steps to reproduce the experiments.
+This document describes the repo structure and the steps to reproduce the experiments.
+
+## Repo Structure
+
+At the moment, the repository consists of six Python files and four non-code files.
+The non-code files are:
+
+- `.gitignore`: For Python development.
+- `LICENSE`: The software is MIT-licensed, so feel free to use the code.
+- `README.md`: You are here :upside_down_face:
+- `requirements.txt`: To set up an environment with all necessary dependencies; see below for details.
+
+Four of the code files are related to the experiments for our paper (see below for details):
+
+- `prepare_datasets.py`: First stage of the experimental pipeline
+  (download prediction datasets).
+- `run_experiments.py`: Second stage of the experimental pipeline
+  (run feature selection, search for alternatives, and make predictions).
+- `run_evaluation.py`: Third stage of the experimental pipeline
+  (compute statistics and create plots for the paper).
+- `data_handling.py`: Functions for working with prediction datasets and experimental data.
+
+Two of the code files contain classes and functions for alternative feature selection.
+If you want to use, modify, or extend alternative feature selection,
+only these two files might be relevant for you:
+
+- `afs.py`: Classes for alternative feature selection.
+  `AlternativeFeatureSelector` is the abstract superclass.
+  It contains solver configuration, the dissimilarity-based definition of alternatives,
+  and the two search procedures, i.e., sequential as well as simultaneous.
+  To integrate a particular feature selector, you need to create a subclass.
+  The subclass needs to define the optimization problem of the feature selector
+  (the objective function and maybe constraints) in `initialize_solver()` and
+  the process of solving the optimization problem in `select_and_evaluate()`.
+  The search procedures for alternatives implemented in `AlternativeFeatureSelector` basically add
+  further constraints (for alternatives) to the optimization problem and call the solving routine.
+  We did this subclassing for the four feature selectors in our experiments, i.e.,
+  mutual informatin (univariate filter), FCBF, model-based importance, and greedy wrapper.
+- `prediction.py`: Functions to make predictions for the experimental pipeline
+  and two of our feature selectors that use prediction models (model-based and wrapper).
 
 ## Setup
 
