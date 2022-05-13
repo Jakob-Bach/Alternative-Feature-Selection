@@ -8,7 +8,7 @@ This repository contains the code of the paper
 Once it's published, we'll add a link to it here.
 We'll link the experimental data, too.)
 
-This document describes the repo structure and the steps to reproduce the experiments.
+This document describes the repo structure, a short demo, and the steps to reproduce the experiments.
 
 ## Repo Structure
 
@@ -48,6 +48,50 @@ only these two files might be relevant for you:
   mutual informatin (univariate filter), FCBF, model-based importance, and greedy wrapper.
 - `prediction.py`: Functions to make predictions for the experimental pipeline
   and two of our feature selectors that use prediction models (model-based and wrapper).
+
+## Demo
+
+Running alternative feature selection only requires three steps:
+
+1) Create the feature selector (our code contains four different ones).
+2) Set the dataset:
+  - feature-part and prediction target separated, train-test split
+  - data types: `DataFrame` and `Series` from `pandas`
+3) Run the search for alternatives:
+   - Method name determines whether sequential or simultaneous search is run.
+   - `k` determines the number of features to be selected.
+   - `num_alternatives` determines ... you can guess what.
+   - `tau_abs` determines by how many features the feature sets should differ.
+     You can also provide a relative value as `tau`,
+     and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
+
+```python
+import afs
+import sklearn.datasets
+import sklearn.model_selection
+
+dataset = sklearn.datasets.load_iris(as_frame=True)
+X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(
+    dataset['data'], dataset['target'], train_size=0.8, random_state=25)
+feature_selector = afs.MISelector()
+feature_selector.set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+search_result = feature_selector.search_sequentially(k=3, num_alternatives=5, tau_abs=1)
+print(search_result.drop(columns='optimization_time').round(2))
+```
+
+The search result is a `DataFrame`:
+
+```
+  selected_idxs  train_objective  test_objective  optimization_status
+0     [0, 2, 3]             0.91            0.89                    0
+1     [1, 2, 3]             0.83            0.78                    0
+2     [0, 1, 3]             0.64            0.65                    0
+3     [0, 1, 2]             0.62            0.68                    0
+4            []              NaN             NaN                    2
+5            []              NaN             NaN                    2
+```
+
+The search procedure ran out of feature here, as the `iris` dataset only has four features.
 
 ## Setup
 
