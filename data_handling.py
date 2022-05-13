@@ -1,6 +1,6 @@
 """Data handling
 
-Functions for data I/O.
+Functions for data I/O in the experimental pipeline (prediction datasets and experimental data).
 """
 
 
@@ -14,7 +14,7 @@ import pandas as pd
 def load_dataset(dataset_name: str, directory: pathlib.Path) -> Tuple[pd.DataFrame, pd.Series]:
     X = pd.read_csv(directory / (dataset_name + '_X.csv'))
     y = pd.read_csv(directory / (dataset_name + '_y.csv')).squeeze(axis='columns')
-    assert isinstance(y, pd.Series)  # a DataFrame would cause errors somewhere in the pipeline
+    assert isinstance(y, pd.Series)  # a DataFrame might cause errors somewhere in the pipeline
     return X, y
 
 
@@ -28,13 +28,13 @@ def list_datasets(directory: pathlib.Path) -> Sequence[str]:
     return [file.name.split('_y.')[0] for file in list(directory.glob('*_y.*'))]
 
 
-# Return the path of the file with either complete results or only a particular combi of dataset,
-# fold, and feature selection.
+# Return the path of the file containing either complete experimental results or only a particular
+# combination of dataset, fold, and feature-selection method.
 def get_results_file_path(directory: pathlib.Path, dataset_name: Optional[str] = None,
                           split_idx: Optional[int] = None, fs_name: Optional[str] = None) -> pathlib.Path:
     if (dataset_name is not None) and (split_idx is not None) and (fs_name is not None):
         return directory / (f'{dataset_name}_{split_idx}_{fs_name}_results.csv')
-    return directory / 'results.csv'
+    return directory / '_results.csv'
 
 
 # Load either complete results or only a particular combi of dataset, fold, and feature selection.
@@ -44,6 +44,7 @@ def load_results(directory: pathlib.Path, dataset_name: Optional[str] = None,
                                          split_idx=split_idx, fs_name=fs_name)
     if results_file.exists():
         return pd.read_csv(results_file)
+    # If particular results file does not exist, just grab and merge all results in the directory:
     return pd.concat([pd.read_csv(x) for x in directory.glob('*_results.*')], ignore_index=True)
 
 

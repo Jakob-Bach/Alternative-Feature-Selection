@@ -1,6 +1,7 @@
 """Prediction
 
-Functions for making and evaluating predictions.
+Functions for making and evaluating predictions. Used in the experimental pipeline as well as some
+of the feature selectors (e.g., wrapper feature selection).
 """
 
 
@@ -16,14 +17,14 @@ import sklearn.tree
 
 
 MODELS = [
-    {'name': 'Decision tree', 'func': sklearn.tree.DecisionTreeClassifier,
+    {'name': 'decision_tree', 'func': sklearn.tree.DecisionTreeClassifier,
      'args': {'criterion': 'entropy', 'random_state': 25}},
-    {'name': 'Random forest', 'func': sklearn.ensemble.RandomForestClassifier,
+    {'name': 'random_forest', 'func': sklearn.ensemble.RandomForestClassifier,
      'args': {'n_estimators': 100, 'criterion': 'entropy', 'random_state': 25}}
-]
+]  # prediction models used in the experimental pipeline
 
 
-# Return the default prediction model for embedded and wrapper feature selection.
+# Return the default prediction model for importance-based and wrapper feature selection.
 def create_model_for_fs() -> sklearn.base.BaseEstimator:
     return sklearn.tree.DecisionTreeClassifier(criterion='entropy', random_state=25)
 

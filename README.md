@@ -12,7 +12,7 @@ This document describes the repo structure, a short demo, and the steps to repro
 
 ## Repo Structure
 
-At the moment, the repository consists of six Python files and four non-code files.
+At the moment, the repository contains six Python files and four non-code files.
 The non-code files are:
 
 - `.gitignore`: For Python development.
@@ -20,13 +20,13 @@ The non-code files are:
 - `README.md`: You are here :upside_down_face:
 - `requirements.txt`: To set up an environment with all necessary dependencies; see below for details.
 
-Four of the code files are related to the experiments for our paper (see below for details):
+Four of the code files are directly related to our experiments (see below for details):
 
-- `prepare_datasets.py`: First stage of the experimental pipeline
+- `prepare_datasets.py`: First stage of the experiments
   (download prediction datasets).
-- `run_experiments.py`: Second stage of the experimental pipeline
+- `run_experiments.py`: Second stage of the experiments
   (run feature selection, search for alternatives, and make predictions).
-- `run_evaluation.py`: Third stage of the experimental pipeline
+- `run_evaluation.py`: Third stage of the experiments
   (compute statistics and create plots for the paper).
 - `data_handling.py`: Functions for working with prediction datasets and experimental data.
 
@@ -45,7 +45,7 @@ only these two files might be relevant for you:
   The search procedures for alternatives implemented in `AlternativeFeatureSelector` basically add
   further constraints (for alternatives) to the optimization problem and call the solving routine.
   We did this subclassing for the four feature selectors in our experiments, i.e.,
-  mutual informatin (univariate filter), FCBF, model-based importance, and greedy wrapper.
+  mutual information (univariate filter), FCBF, model-based importance, and greedy wrapper.
 - `prediction.py`: Functions to make predictions for the experimental pipeline
   and two of our feature selectors that use prediction models (model-based and wrapper).
 
@@ -55,15 +55,15 @@ Running alternative feature selection only requires three steps:
 
 1) Create the feature selector (our code contains four different ones).
 2) Set the dataset:
-  - feature-part and prediction target separated, train-test split
-  - data types: `DataFrame` and `Series` from `pandas`
+    - feature-part and prediction target separated, train-test split
+    - data types: `DataFrame` and `Series` from `pandas`
 3) Run the search for alternatives:
-   - Method name determines whether sequential or simultaneous search is run.
-   - `k` determines the number of features to be selected.
-   - `num_alternatives` determines ... you can guess what.
-   - `tau_abs` determines by how many features the feature sets should differ.
-     You can also provide a relative value as `tau`,
-     and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
+    - Method name determines whether sequential or simultaneous search is run.
+    - `k` determines the number of features to be selected.
+    - `num_alternatives` determines ... you can guess what.
+    - `tau_abs` determines by how many features the feature sets should differ.
+      You can also provide a relative value (from the interval `[0,1]`) via `tau`,
+      and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
 
 ```python
 import afs
@@ -97,8 +97,8 @@ The search procedure ran out of feature here, as the `iris` dataset only has fou
 
 Before running the scripts to reproduce the experiments, you should
 
-1) Set up an environment (optional, but recommended)
-2) Install all necessary dependencies
+1) Set up an environment (optional, but recommended).
+2) Install all necessary dependencies.
 
 Our code is implemented in Python (version 3.8; other versions, including lower ones, might work as well).
 
@@ -122,7 +122,8 @@ conda deactivate
 
 ### Option 2: `virtualenv` Environment
 
-We used [`virtualenv`](https://virtualenv.pypa.io/) (version 20.4.7; other versions might work as well) to create an environment for our experiments.
+We used [`virtualenv`](https://virtualenv.pypa.io/) (version 20.4.7; other versions might work as well)
+to create an environment for our experiments.
 First, you need to install the correct Python version yourself.
 Let's assume the Python executable is located at `<path/to/python>`.
 Next, you install `virtualenv` with
@@ -181,14 +182,15 @@ Run
 python -m prepare_datasets
 ```
 
-to download and pre-process the input data for the experiments.
+to download and pre-process the input data for the experiments (prediction datasets from PMLB).
 Next, start the experimental pipeline with
 
 ```bash
 python -m run_experiments
 ```
 
-Depending on your hardware, this might take some time.
+Depending on your hardware, this might take several hours or even days
+(we had a runtime of several hours on a server with 32 CPU cores).
 To print statistics and create the plots for the paper, run
 
 ```bash

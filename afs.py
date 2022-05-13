@@ -9,10 +9,10 @@ Classes for alternative feature selection, i.e.,
 from abc import ABCMeta, abstractmethod
 import math
 import time
-from typing import Iterable, Optional, Union, Sequence, Tuple
+from typing import Iterable, Optional, Sequence, Tuple, Union
 
-from ortools.linear_solver import pywraplp
 import numpy as np
+from ortools.linear_solver import pywraplp
 import pandas as pd
 import sklearn.base
 import sklearn.feature_selection
@@ -37,9 +37,10 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         self._y_test = None  # pd.Series
         self._n = None  # int; total number of features
 
-    # Set the data that will be used during search for alternative feature sets. You can override
-    # this method if you want to pre-compute some stuff for feature-selection (so these computations
-    # can be reused if feature selection is called multiple times for the same dataset).
+    # Set the data for the search for alternative feature sets. You can override this method if you
+    # want to pre-compute some stuff for feature selection (so these computations can be reused if
+    # feature selection is called multiple times for the same dataset); even if you ovverride,
+    # please still call this original method to make sure the data is properly set.
     def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
                  y_test: pd.Series) -> None:
         assert X_train.shape[1] == X_test.shape[1], 'Train and test need same number of features.'
@@ -56,22 +57,22 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         return self._X_train, self._X_test, self._y_train, self._y_test
 
     # Return a fresh solver in which the constraints for alternatives will be stored. Do some
-    # initialization that is independent from the feature-selection method used (while
-    # "initialize_solver()" is feature-selection-specific). This routine will be called at the
-    # beginning of the search for alternative feature sets.
+    # initialization that is independent from the feature-selection method (while
+    # "initialize_solver()" is feature-selection-specific). This routine will be called once at the
+    # beginning of each search for alternative feature sets.
     @staticmethod
     def create_solver() -> pywraplp.Solver:
-        solver = pywraplp.Solver.CreateSolver('CBC')
-        solver.SetNumThreads(1)
+        solver = pywraplp.Solver.CreateSolver('CBC')  # see documentation for other solvers
+        solver.SetNumThreads(1)  # we already parallelize experimental pipeline
         solver.SetTimeLimit(60000)  # timeout in ms; solver might still find feasible solution
         return solver
 
-    # Initialize a solver for alternative feature sets specific to the feature-selection method
-    # used, e.g., add an objective or constraints (if the feature-selection method has these).
-    # This routine will be called at the  beginning of the search for alternative feature sets.
-    # - "solver": The solver that will hold the constraints for alternatives.
+    # Initialize a solver (to find alternative feature sets) specific to the feature-selection
+    # method, e.g., add an objective or constraints (if the feature-selection method has these).
+    # This routine will be called once at the beginning of the search for alternative feature sets.
+    # - "solver": The solver that will hold the objective and the constraints for alternatives.
     # - "s_list": The feature-selection decision variables. For sequential search, len(s_list) == 1,
-    #   while simultaneous search considers multiple feature sets at once. For each feature sets,
+    #   while simultaneous search considers multiple feature sets at once. For each feature set,
     #   there should be as many decision variables as there are features in the dataset.
     @abstractmethod
     def initialize_solver(self, solver: pywraplp.Solver,
@@ -103,17 +104,17 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
 
     # Return a constraint such that the dissimilarity between two feature sets of desired size "k"
     # is over a threshold "tau". The selection decisions "s2" for the 2nd feature set are unknown
-    # (thus, they are variables), while the decisions "s1" for the first feature set can be
-    # either unknown (variables) or known (vector of 0/1 or false/true).
-    # Currently supported for "d_name" are "dice" and "jaccard". For "dice", you can also provide
-    # an absolute number of differing features "tau_abs" instead of a relative "tau" from [0, 1].
+    # (thus, they are variables), while the selection decisions "s1" for the first feature set can
+    # be either unknown (variables) or known (vector of 0/1 or false/true).
+    # Currently supported for the dissimilarity "d_name" are "dice" and "jaccard". For "dice", you
+    # can also provide an absolute number of differing features "tau_abs" instead of a relative
+    # "tau" from the interval [0, 1].
     @staticmethod
     def create_pairwise_alternative_constraint(
             solver: pywraplp.Solver, s1: Sequence[Union[pywraplp.Variable, int, bool]],
             s2: Sequence[pywraplp.Variable], k: int, tau: Optional[float] = None,
             tau_abs: Optional[int] = None, d_name: str = 'dice') -> pywraplp.LinearConstraint:
         assert len(s1) == len(s2), 'Decision vectors s1 and s2 need to have same length.'
-        assert isinstance(s2[0], pywraplp.Variable), 's2 needs to contain variables.'
         if isinstance(s1[0], pywraplp.Variable):  # both feature sets undetermined
             overlap_size = solver.Sum([AlternativeFeatureSelector.create_product_var(
                 solver=solver, var1=s1_j, var2=s2_j) for (s1_j, s2_j) in zip(s1, s2)])
@@ -201,8 +202,8 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
     def compute_qualities(self, X: pd.DataFrame, y: pd.Series) -> Iterable[float]:
         raise NotImplementedError('Abstract method.')
 
-    # Set the data that will be used during search for alternative feature sets and pre-compute the
-    # features' qualities.
+    # Set the data for the search for alternative feature sets and pre-compute the features'
+    # qualities for the objective.
     def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
                  y_test: pd.Series) -> None:
         super().set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
@@ -220,8 +221,8 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         objective = solver.Sum(self._Q_train_list)  # sum over all feature sets
         solver.Maximize(objective)
 
-    # Run feature-selection with the solver. As this class represents a white-box objective, we can
-    # directly run the optimization routine of the "solver".
+    # Run feature-selection with the solver. As this class represents a white-box objective (set in
+    # "initialize_solver()"), we can directly run the optimization routine of the "solver".
     # See the superclass for a description of the parameters and the return value.
     def select_and_evaluate(self, solver: pywraplp.Solver,
                             s_list: Sequence[Sequence[pywraplp.Variable]]) -> pd.DataFrame:
@@ -284,17 +285,18 @@ class FCBFSelector(MISelector):
         self._mi_target = None  # np.ndarray; dependency of each feature to target
         self._mi_features = None  # Sequence[np.ndarray]; dependency of each feature to each other
 
-    # Set the data that will be used during search for alternative feature sets. Pre-compute the
-    # feature-target and feature-feature dependencies that will be used for constraints later.
+    # Set the data for the search for alternative feature sets. Pre-compute the feature-target and
+    # feature-feature dependencies that will be used for constraints later.
     def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
                  y_test: pd.Series) -> None:
         super().set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+        # We already have the feature-target MI in "_q_train", but normalized, so compute again:
         self._mi_target = MISelector.mutual_info(X=self._X_train, y=self._y_train)
         self._mi_features = [MISelector.mutual_info(X=self._X_train, y=self._X_train[feature])
                              for feature in self._X_train.columns]
 
     # Initialize the "solver" by creating linear objectives from the features' qualities and
-    # adding constraints on the feature-feature depencies.
+    # adding constraints on the feature-feature dependencies.
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
@@ -352,7 +354,7 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         self._max_iters = max_iters
 
     # Set a constant objective, as the solver should only check validity of solutions in this
-    # approach (the actual objective, i.e., prediction performance, is a black-box).
+    # approach (the actual objective, i.e., prediction performance, is a black box).
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
@@ -361,7 +363,7 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
 
     # Run a greedy hill-climbing procedure to select features. In particular, start with a feature
     # set satisfying all constraints and systematically try flipping the selection decisions of
-    # individual features. Continue with a new solution if it has higher quality then the currently
+    # individual features. Continue with a new solution if it has higher quality than the currently
     # best one. Use a prediction model to evaluate qualities of the feature sets. Stop after a fixed
     # number of iterations (= solver calls) or if no new valid feature set can be generated.
     # See the superclass for a description of the parameters and the return value.
@@ -375,7 +377,7 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                 'selected_idxs': [[] for _ in s_list],
                 'train_objective': [float('nan') for _ in s_list],
                 'test_objective': [float('nan') for _ in s_list]
-            })
+            })  # not even one valid alternative found
         else:
             s_value_list = [[bool(s_j.solution_value()) for s_j in s] for s in s_list]
             # Note that "training" quality actually is validation performance with a holdout split
@@ -413,9 +415,10 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                 'selected_idxs': selected_idxs,
                 'train_objective': Q_train_list,
                 # To be consistent to other FS techniques, we evaluate the test objective by
-                # considering test data (to be exact: the validation part of a holdout split of it)
-                # only; main experimental pipeline contains "classic" evaluation with training model
-                # on full (without holdout split) training set and predicting on full train + test
+                # considering test data only, i.e., we make a holdout split of the test data, train
+                # a new prediction model on one part of it and evaluate the model on the rest of it;
+                # the main experimental pipeline contains the "classic" evaluation with training
+                # model on (full) training set and predicting on full train + test
                 'test_objective': [prediction.evaluate_wrapper(
                     model=self._prediction_model, X=self._X_test.iloc[:, idxs],
                     y=self._y_test) for idxs in selected_idxs]
@@ -423,5 +426,5 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         end_time = time.process_time()
         result['optimization_time'] = end_time - start_time
         result['optimization_status'] = optimization_status
-        result['iters'] = iters
+        result['wrapper_iters'] = iters
         return result

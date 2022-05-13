@@ -2,7 +2,7 @@
 
 Script to run the full experimental pipeline. Should be run after dataset preparation, as this
 script requires the prediction datasets as inputs. Saves its results for evaluation. If some
-results already exist, only run the missing experimental settings.
+results already exist, only runs the missing experimental settings.
 
 Usage: python -m run_experiments --help
 """
@@ -22,13 +22,13 @@ import data_handling
 import prediction
 
 
-# Different components of the experimental design, excluding names of the search methods for
+# Different components of the experimental design, excluding the names of the search methods for
 # alternatives (hard-coded below) and prediction models (queried from the module "prediction").
 N_FOLDS = 10  # cross-validation for search and predictions
 FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.GreedyWrapperSelector, afs.MISelector,
                           afs.ModelImportanceSelector]
 K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
-NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search
+NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search (also yields all intermediate solutions)
 NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
 
 
@@ -53,7 +53,7 @@ def define_experimental_settings(data_dir: pathlib.Path,
 
 # Evaluate one search for alternatives for one feature selection method (on one split of a dataset).
 # In particular, call the "afs_search_func_name" on the "feature_selector", considering the
-# parameters "k", "tau", and "num_alternatives".
+# parameters "k", "tau_abs", and "num_alternatives".
 # Return a table with various evaluation metrics, including parametrization of the search,
 # objective value, and prediction performance with the feature sets found.
 def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_search_func_name: str,
@@ -143,10 +143,10 @@ def run_experiments(data_dir: pathlib.Path, results_dir: pathlib.Path,
 # Parse some command-line arguments and run the main routine.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Runs all experiments without results from the complete experimental pipeline.',
+        description='Runs complete experimental pipeline except settings that already have results.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--data', type=pathlib.Path, default='data/datasets/', dest='data_dir',
-                        help='Directory with input data, i.e., datasets in (X, y) form.')
+                        help='Directory with input data, i.e., prediction datasets in (X, y) form.')
     parser.add_argument('-r', '--results', type=pathlib.Path, default='data/results/', dest='results_dir',
                         help='Directory for output data, i.e., experimental results.')
     parser.add_argument('-p', '--processes', type=int, default=None, dest='n_processes',
