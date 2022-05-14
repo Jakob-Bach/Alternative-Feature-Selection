@@ -309,8 +309,8 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
         ['tau_abs', 'fs_name'])['train_objective'].median().reset_index().pivot(
             index='tau_abs', columns='fs_name').round(2))
 
-    print('How many new features occur in a feature set from one alternative to next in sequential',
-          'search for MI as feature selector?')
+    print('\nHow many new features occur in a feature set from one alternative to next in',
+          'sequential search for MI as feature selector?')
     feature_diff_results = seq_results.copy()
     feature_diff_results['prev_selected_idxs'] = feature_diff_results.groupby(
         group_cols)['selected_idxs'].shift().fillna('').apply(list)

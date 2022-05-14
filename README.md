@@ -191,6 +191,9 @@ python -m run_experiments
 
 Depending on your hardware, this might take several hours or even days
 (we had a runtime of several hours on a server with 32 CPU cores).
+In case the pipeline is nearly finished, but doesn't make progress any more,
+the solver might have silently crashed.
+You can re-run the pipeline, in which case it detects existing results and focuses on missing ones.
 To print statistics and create the plots for the paper, run
 
 ```bash
