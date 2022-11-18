@@ -22,8 +22,9 @@ plt.rcParams['font.family'] = 'Helvetica'  # IEEE template's sans-serif font
 
 
 # Main-routine: run complete evaluation pipeline. To that end, read results from the "results_dir"
-# and save plots to the "plot_dir". Prints some statistics to the console.
-def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
+# and some dataset information from "data_dir". Save plots to the "plot_dir". Print some statistics
+# to the console.
+def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     if not results_dir.is_dir():
         raise FileNotFoundError('Results directory does not exist.')
     if not plot_dir.is_dir():
@@ -59,6 +60,17 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
 
     print('\nHow often do certain optimization statuses occur?')
     print(results['optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
+
+    print('\n---- Datasets ----')
+
+    dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
+    dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
+    dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': 'm',
+                                     'n_features': 'n'}, inplace=True)
+    dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('GAMETES', 'G')
+    dataset_overview.sort_values(by='Dataset', key=lambda x: x.str.lower(), inplace=True)
+    with pd.option_context('max_colwidth', 1000):  # avoid truncation
+        print(dataset_overview.to_latex(index=False))
 
     print('\n------ Evaluation ------')
 
@@ -329,6 +341,8 @@ def evaluate(results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates the paper\'s plots and print statistics.',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-d', '--data', type=pathlib.Path, default='data/datasets/', dest='data_dir',
+                        help='Directory with prediction datasets in (X, y) form.')
     parser.add_argument('-r', '--results', type=pathlib.Path, default='data/results/',
                         dest='results_dir', help='Directory with experimental results.')
     parser.add_argument('-p', '--plots', type=pathlib.Path, default='data/plots/',

@@ -42,7 +42,7 @@ def prepare_datasets(data_dir: pathlib.Path) -> None:
     assert pd.Series(DUPLICATE_DATASETS).isin(dataset_overview['dataset']).all()  # check for typos
     dataset_overview = dataset_overview[~dataset_overview['dataset'].isin(DUPLICATE_DATASETS)]
     assert len(dataset_overview) == 30  # if this changes, we would need to adapt paper as well
-    dataset_overview.to_csv(data_dir / '_dataset_overview.csv', index=False)
+    data_handling.save_dataset_overview(dataset_overview=dataset_overview, directory=data_dir)
 
     # Save individual datasets:
     print('Downloading and saving datasets ...')

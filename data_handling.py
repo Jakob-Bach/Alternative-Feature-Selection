@@ -28,6 +28,14 @@ def list_datasets(directory: pathlib.Path) -> Sequence[str]:
     return [file.name.split('_y.')[0] for file in list(directory.glob('*_y.*'))]
 
 
+def load_dataset_overview(directory: pathlib.Path) -> pd.DataFrame:
+    return pd.read_csv(directory / '_dataset_overview.csv')
+
+
+def save_dataset_overview(dataset_overview: pd.DataFrame, directory: pathlib.Path) -> None:
+    dataset_overview.to_csv(directory / '_dataset_overview.csv', index=False)
+
+
 # Return the path of the file containing either complete experimental results or only a particular
 # combination of dataset, fold, and feature-selection method.
 def get_results_file_path(directory: pathlib.Path, dataset_name: Optional[str] = None,
