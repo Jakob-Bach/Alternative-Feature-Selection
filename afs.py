@@ -74,9 +74,12 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "s_list": The feature-selection decision variables. For sequential search, len(s_list) == 1,
     #   while simultaneous search considers multiple feature sets at once. For each feature set,
     #   there should be as many decision variables as there are features in the dataset.
+    # - "objective_agg": How to aggregate the feature sets' qualities in the objective (if there are
+    #   multiple feature sets optimized at once, i.e., in simultaneous search).
     @abstractmethod
     def initialize_solver(self, solver: pywraplp.Solver,
-                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
+                          s_list: Sequence[Sequence[pywraplp.Variable]],
+                          objective_agg: str = 'sum') -> None:
         raise NotImplementedError('Abstract method.')
 
     # Feature-selection method that is used (as subroutine) in the search for alternatives.
@@ -135,16 +138,20 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
     # - "tau_abs": absolute number of differing features (only works for "dice")
     # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
+    # - "objective_agg": How to aggregate the feature sets' qualities in the objective. Parameter
+    #   only exists for consistency to simultaneous search but is irrelevant here (as we only find
+    #   one feature set per iteration, we do not need to aggregate over feature sets).
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
     def search_sequentially(self, k: int, num_alternatives: int, tau: Optional[float] = None,
-                            tau_abs: Optional[int] = None, d_name: str = 'dice') -> pd.DataFrame:
+                            tau_abs: Optional[int] = None, d_name: str = 'dice',
+                            objective_agg: str = 'sum') -> pd.DataFrame:
         results = []
         solver = AlternativeFeatureSelector.create_solver()
         s = [solver.BoolVar(name=f's_{j}') for j in range(self._n)]
         s_list = [s]  # only search for one feature set at a time
         solver.Add(solver.Sum(s) == k)  # select exactly k
-        self.initialize_solver(solver=solver, s_list=s_list)
+        self.initialize_solver(solver=solver, s_list=s_list, objective_agg='sum')
         results.append(self.select_and_evaluate(solver=solver, s_list=s_list))  # "original" set
         for _ in range(num_alternatives):
             if not math.isnan(results[-1]['train_objective'].iloc[0]):  # if not infeasible
@@ -162,10 +169,12 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
     # - "tau_abs": absolute number of differing features (only works for "dice")
     # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
+    # - "objective_agg": How to aggregate the feature sets' qualities in the objective.
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
     def search_simultaneously(self, k: int, num_alternatives: int, tau: Optional[float] = None,
-                              tau_abs: Optional[int] = None, d_name: str = 'dice') -> pd.DataFrame:
+                              tau_abs: Optional[int] = None, d_name: str = 'dice',
+                              objective_agg: str = 'sum') -> pd.DataFrame:
         solver = AlternativeFeatureSelector.create_solver()
         s_list = []
         for i in range(num_alternatives + 1):  # find "num_alternatives" + 1 feature sets
@@ -175,7 +184,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
                 solver.Add(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
                     solver=solver, s1=s, s2=s2, k=k, tau=tau, tau_abs=tau_abs, d_name=d_name))
             s_list.append(s)
-        self.initialize_solver(solver=solver, s_list=s_list)
+        self.initialize_solver(solver=solver, s_list=s_list, objective_agg=objective_agg)
         return self.select_and_evaluate(solver=solver, s_list=s_list)
 
 
@@ -213,12 +222,24 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
     # Initialize the "solver" by creating linear objectives from the features' qualities.
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
-                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
+                          s_list: Sequence[Sequence[pywraplp.Variable]],
+                          objective_agg: str = 'sum') -> None:
         self._Q_train_list = [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_train, s)])
                               for s in s_list]
         self._Q_test_list = [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_test, s)])
                              for s in s_list]
-        objective = solver.Sum(self._Q_train_list)  # sum over all feature sets
+        if objective_agg == 'sum':
+            objective = solver.Sum(self._Q_train_list)  # sum over all feature sets
+        elif objective_agg == 'min':
+            Q_upper_bound = sum(self._q_train)  # quality if selecting all features
+            Q_min = solver.NumVar(name='Q_min', lb=0, ub=Q_upper_bound)
+            for i in range(len(s_list)):
+                Q_i = solver.NumVar(name=f'Q_{i}', lb=0, ub=Q_upper_bound)
+                solver.Add(Q_i == self._Q_train_list[i])
+                solver.Add(Q_min <= Q_i)
+            objective = Q_min
+        else:
+            raise ValueError('Unknown objective aggregation.')
         solver.Maximize(objective)
 
     # Run feature-selection with the solver. As this class represents a white-box objective (set in
@@ -349,8 +370,9 @@ class FCBFSelector(MISelector):
     # adding constraints on the feature-feature dependencies.
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
-                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
-        super().initialize_solver(solver=solver, s_list=s_list)
+                          s_list: Sequence[Sequence[pywraplp.Variable]],
+                          objective_agg: str = 'sum') -> None:
+        super().initialize_solver(solver=solver, s_list=s_list, objective_agg=objective_agg)
         # Note that the MI estimator in sklearn is not perfectly bivariate and symmetric, as it uses
         # *one* random-number generator to *iteratively* add some noise to *all* features and
         # target; e.g., if you re-order features in X, MI estimates change slightly, though the
@@ -404,12 +426,27 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         self._max_iters = max_iters
 
     # Set a constant objective, as the solver should only check validity of solutions in this
-    # approach (the actual objective, i.e., prediction performance, is a black box).
+    # approach (the actual objective, i.e., prediction performance, is a black box for the solver).
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
-                          s_list: Sequence[Sequence[pywraplp.Variable]]) -> None:
+                          s_list: Sequence[Sequence[pywraplp.Variable]],
+                          objective_agg: str = 'sum') -> None:
+        self._objective_agg = objective_agg
         objective = 0
         solver.Maximize(objective)
+
+    # Decide if the overall quality objective has improved based on some aggregation function (which
+    # is stored in a field of "self").
+    # - "old_Q_list": Qualities of the previously selected feature sets.
+    # - "new_Q_list": Qualities of the newly selected feature sets.
+    def has_objective_improved(self, old_Q_list: Iterable[float],
+                               new_Q_list: Iterable[float]) -> bool:
+        if self._objective_agg == 'sum':
+            return sum(new_Q_list) > sum(old_Q_list)
+        elif self._objective_agg == 'min':
+            return min(new_Q_list) > min(old_Q_list)
+        else:
+            raise ValueError('Unknown objective aggregation.')
 
     # Run a greedy hill-climbing procedure to select features. In particular, start with a feature
     # set satisfying all constraints and systematically try flipping the selection decisions of
@@ -449,7 +486,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                     current_Q_train_list = [prediction.evaluate_wrapper(
                         model=self._prediction_model, X=self._X_train.iloc[:, s_value],
                         y=self._y_train) for s_value in current_s_value_list]
-                    if sum(current_Q_train_list) > sum(Q_train_list):
+                    if self.has_objective_improved(old_Q_list=Q_train_list,
+                                                   new_Q_list=current_Q_train_list):
                         s_value_list = current_s_value_list
                         Q_train_list = current_Q_train_list
                         j = 0  # re-start swapping with first feature (zero indexing!)

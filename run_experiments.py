@@ -30,6 +30,7 @@ FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.GreedyWrapperSelector, afs.MISel
 K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
 NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search (also yields all intermediate solutions)
 NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
+OBJECTIVE_AGG_SIMULTANEOUS_VALUES = ['min', 'sum']
 
 
 # Define experimental settings as cross-product of datasets (from "data_dir"), cross-validation
@@ -53,14 +54,16 @@ def define_experimental_settings(data_dir: pathlib.Path,
 
 # Evaluate one search for alternatives for one feature selection method (on one split of a dataset).
 # In particular, call the "afs_search_func_name" on the "feature_selector", considering the
-# parameters "k", "tau_abs", and "num_alternatives".
+# parameters "k", "tau_abs", "num_alternatives", and "objective_agg".
 # Return a table with various evaluation metrics, including parametrization of the search,
 # objective value, and prediction performance with the feature sets found.
 def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_search_func_name: str,
-                        k: int, tau_abs: int, num_alternatives: int) -> pd.DataFrame:
+                        k: int, tau_abs: int, num_alternatives: int,
+                        objective_agg: str = 'sum') -> pd.DataFrame:
     X_train, X_test, y_train, y_test = feature_selector.get_data()
     afs_search_func = getattr(feature_selector, afs_search_func_name)
-    result = afs_search_func(k=k, tau_abs=tau_abs, num_alternatives=num_alternatives)
+    result = afs_search_func(k=k, tau_abs=tau_abs, num_alternatives=num_alternatives,
+                             objective_agg=objective_agg)
     for model_dict in prediction.MODELS:  # train each model with all feature sets found
         model = model_dict['func'](**model_dict['args'])
         prediction_performances = [prediction.train_and_evaluate(
@@ -75,6 +78,7 @@ def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_se
     result['k'] = k
     result['tau_abs'] = tau_abs
     result['num_alternatives'] = num_alternatives
+    result['objective_agg'] = objective_agg
     result['search_name'] = afs_search_func_name
     return result
 
@@ -100,10 +104,12 @@ def evaluate_feature_selector(
             results.append(evaluate_one_search(
                 feature_selector=feature_selector, afs_search_func_name='search_sequentially',
                 k=k, tau_abs=tau_abs, num_alternatives=NUM_ALTERNATIVES_SEQUENTIAL))
-            for num_alternatives in NUM_ALTERNATIVES_SIMULTANEOUS_VALUES:
+            for num_alternatives, objective_agg in itertools.product(
+                    NUM_ALTERNATIVES_SIMULTANEOUS_VALUES, OBJECTIVE_AGG_SIMULTANEOUS_VALUES):
                 results.append(evaluate_one_search(
                     feature_selector=feature_selector, afs_search_func_name='search_simultaneously',
-                    k=k, tau_abs=tau_abs, num_alternatives=num_alternatives))
+                    k=k, tau_abs=tau_abs, num_alternatives=num_alternatives,
+                    objective_agg=objective_agg))
     results = pd.concat(results, ignore_index=True)
     results['fs_name'] = feature_selector_type.__name__
     results['dataset_name'] = dataset_name
