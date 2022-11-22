@@ -247,6 +247,56 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         result['optimization_status'] = optimization_status
         return result
 
+    # Greedy-replacement search for alternative feature sets. Optimal for univariate feature
+    # qualities (objective: sum of them) as long a there are unused features. Works without solver.
+    # Tailored to the Dice dissimilarity.
+    # - "k": number of features to select
+    # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
+    # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
+    # - "tau_abs": absolute number of differing features
+    # Return a table of results ("selected_idx", "train_objective", "test_objective",
+    # "optimization_time", "optimization_status").
+    def search_greedy_replacement(self, k: int, num_alternatives: int, tau: Optional[float] = None,
+                                  tau_abs: Optional[int] = None) -> pd.DataFrame:
+        if tau is not None:
+            tau_abs = math.ceil(tau * k)
+        if k > self._n:
+            return pd.DataFrame()
+        results = []
+        indices = np.argsort(self._q_train)[::-1]  # descending order
+        s = [0] * self._n
+        position = 0
+        while position < k - tau_abs:
+            j = indices[position]
+            s[j] = 1
+            position = position + 1
+        i = 0
+        while i <= num_alternatives and i <= ((self._n - k) / tau_abs):
+            s_i = s.copy()
+            for _ in range(tau_abs):
+                j = indices[position]
+                s_i[j] = 1
+                position = position + 1
+            results.append(s_i)
+            i = i + 1
+        # Transform into a result structure consistent to the other searches:
+        results = [{
+            'selected_idxs': [j for (j, s_j) in enumerate(s) if s_j],
+            'train_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_train, s)),
+            'test_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s)),
+            'optimization_status': pywraplp.Solver.OPTIMAL
+        } for s in results]
+        for i in range(i, num_alternatives + 1):  # in case algoritithm ran out of features early
+            results.append({
+                'selected_idxs': [],
+                'train_objective': float('nan'),
+                'test_objective': float('nan'),
+                'optimization_status': pywraplp.Solver.NOT_SOLVED
+            })
+        results = pd.DataFrame(results)
+        results['optimization_time'] = float('nan')  # not worth to measure it
+        return results
+
 
 class MISelector(LinearQualityFeatureSelector):
     """Feature Selection with Mutual Information
