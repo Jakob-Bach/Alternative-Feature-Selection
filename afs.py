@@ -68,7 +68,6 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     def create_solver() -> pywraplp.Solver:
         solver = pywraplp.Solver.CreateSolver('CBC')  # see documentation for other solvers
         solver.SetNumThreads(1)  # we already parallelize experimental pipeline
-        solver.SetTimeLimit(60000)  # timeout in ms; solver might still find feasible solution
         return solver
 
     # Initialize a solver (to find alternative feature sets) specific to the feature-selection
@@ -85,6 +84,8 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]],
                           k: int, objective_agg: str = 'sum') -> None:
+        solver.SetTimeLimit(60000 * len(s_list))  # measured in milliseconds; proportional to ...
+        # ... the number of feature sets per solver call (i.e., higher for simultaneous search)
         for s in s_list:
             solver.Add(solver.Sum(s) == k)
 
