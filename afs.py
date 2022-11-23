@@ -26,7 +26,11 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     The base class for alternative feature selection. Contains the search routines for alternatives
     (simultaneous, sequential) and various helper functions to formulate constraints. Class is
     abstract because an actual feature-selection method (used as subroutine in the search for
-    alternatives) is not implemented here.
+    alternatives) is not implemented here. Subclasses should at least override:
+    1) "initialize_solver()" (add feature-selection-specific objective and constraints)
+    2) "select_and_evaluate()" (use the solver to find feature sets)
+    Optionally, you can override "set_data()" to do dataset-specific pre-computations (once per
+    dataset instead of once for each solver initialization).
     """
 
     # Initialize all fields.
@@ -39,7 +43,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
 
     # Set the data for the search for alternative feature sets. You can override this method if you
     # want to pre-compute some stuff for feature selection (so these computations can be reused if
-    # feature selection is called multiple times for the same dataset); even if you ovverride,
+    # feature selection is called multiple times for the same dataset); even if you override,
     # please still call this original method to make sure the data is properly set.
     def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
                  y_test: pd.Series) -> None:
@@ -74,13 +78,15 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "s_list": The feature-selection decision variables. For sequential search, len(s_list) == 1,
     #   while simultaneous search considers multiple feature sets at once. For each feature set,
     #   there should be as many decision variables as there are features in the dataset.
+    # - "k": The number of features to be selected.
     # - "objective_agg": How to aggregate the feature sets' qualities in the objective (if there are
-    #   multiple feature sets optimized at once, i.e., in simultaneous search).
-    @abstractmethod
+    #   multiple feature sets optimized at once, i.e., in simultaneous search). Not used here, but
+    # should be considered when defining the objective in subclasses.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]],
-                          objective_agg: str = 'sum') -> None:
-        raise NotImplementedError('Abstract method.')
+                          k: int, objective_agg: str = 'sum') -> None:
+        for s in s_list:
+            solver.Add(solver.Sum(s) == k)
 
     # Feature-selection method that is used (as subroutine) in the search for alternatives.
     # See "initialize_solver()" for a description of the parameters.
@@ -150,8 +156,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         solver = AlternativeFeatureSelector.create_solver()
         s = [solver.BoolVar(name=f's_{j}') for j in range(self._n)]
         s_list = [s]  # only search for one feature set at a time
-        solver.Add(solver.Sum(s) == k)  # select exactly k
-        self.initialize_solver(solver=solver, s_list=s_list, objective_agg='sum')
+        self.initialize_solver(solver=solver, s_list=s_list, k=k, objective_agg='sum')
         results.append(self.select_and_evaluate(solver=solver, s_list=s_list))  # "original" set
         for _ in range(num_alternatives):
             if not math.isnan(results[-1]['train_objective'].iloc[0]):  # if not infeasible
@@ -179,62 +184,52 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         s_list = []
         for i in range(num_alternatives + 1):  # find "num_alternatives" + 1 feature sets
             s = [solver.BoolVar(name=f's{i}_{j}') for j in range(self._n)]
-            solver.Add(solver.Sum(s) == k)
             for s2 in s_list:
                 solver.Add(AlternativeFeatureSelector.create_pairwise_alternative_constraint(
                     solver=solver, s1=s, s2=s2, k=k, tau=tau, tau_abs=tau_abs, d_name=d_name))
             s_list.append(s)
-        self.initialize_solver(solver=solver, s_list=s_list, objective_agg=objective_agg)
+        self.initialize_solver(solver=solver, s_list=s_list, k=k, objective_agg=objective_agg)
         return self.select_and_evaluate(solver=solver, s_list=s_list)
 
 
-class LinearQualityFeatureSelector(AlternativeFeatureSelector):
-    """Feature Selection with Linear Quality Function
+class WhiteBoxFeatureSelector(AlternativeFeatureSelector, metaclass=ABCMeta):
+    """Feature Selection as White-Box Problem
 
-    (Abstract) white-box feature selector whose objective function is the sum of the individual
-    features' qualities. This allows pre-computing the qualities when the data is set and re-using
-    these qualities for multiple selection/alternative-search runs. Subclasses need to define the
-    function for computing the qualities.
+    (Abstract) white-box feature selector. Subclasses need to define the function for creating the
+    (train and test) objectives.
     """
 
     # Initialize all fields.
     def __init__(self):
         super().__init__()
-        self._q_train = None  # Iterable[float]; qualities of the individual features
-        self._q_test = None  # Iterable[float]; for evaluation only, not optimization
         self._Q_train_list = None  # Sequence[pywraplp.LinearExpr]; objectives for the feature sets
         self._Q_test_list = None  # Sequence[pywraplp.LinearExpr]; for evaluation, not optimization
 
-    # Should return a sequence of qualities with len(result) == X.shape[1], i.e., one quality value
-    # for each feature.
+    # Should return expressions for train objective and test objectives (one per desired feature
+    # set, i.e., element from "s_list"), using variables from "s_list", data stored internally, and
+    # potentially the number of features "k". Might add auxiliary variables and constraints to the
+    # "solver".
     @abstractmethod
-    def compute_qualities(self, X: pd.DataFrame, y: pd.Series) -> Iterable[float]:
+    def create_objectives(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
+            -> Tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
         raise NotImplementedError('Abstract method.')
 
-    # Set the data for the search for alternative feature sets and pre-compute the features'
-    # qualities for the objective.
-    def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
-                 y_test: pd.Series) -> None:
-        super().set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
-        self._q_train = self.compute_qualities(X=X_train, y=y_train)
-        self._q_test = self.compute_qualities(X=X_test, y=y_test)
-
-    # Initialize the "solver" by creating linear objectives from the features' qualities.
+    # Initialize the solver by creating an expression of the objective for each feature set in
+    # "s_list" and aggregating this to an overall objective.
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]],
-                          objective_agg: str = 'sum') -> None:
-        self._Q_train_list = [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_train, s)])
-                              for s in s_list]
-        self._Q_test_list = [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_test, s)])
-                             for s in s_list]
+                          k: int, objective_agg: str = 'sum') -> None:
+        super().initialize_solver(solver=solver, s_list=s_list, k=k, objective_agg=objective_agg)
+        self._Q_train_list, self._Q_test_list = self.create_objectives(solver=solver, s_list=s_list,
+                                                                       k=k)
         if objective_agg == 'sum':
             objective = solver.Sum(self._Q_train_list)  # sum over all feature sets
         elif objective_agg == 'min':
-            Q_upper_bound = sum(self._q_train)  # quality if selecting all features
-            Q_min = solver.NumVar(name='Q_min', lb=0, ub=Q_upper_bound)
+            Q_min = solver.NumVar(name='Q_min', lb=float('-inf'), ub=float('inf'))
             for i in range(len(s_list)):
-                Q_i = solver.NumVar(name=f'Q_{i}', lb=0, ub=Q_upper_bound)
+                Q_i = solver.NumVar(name=f'Q_{i}', lb=float('-inf'), ub=float('inf'))
                 solver.Add(Q_i == self._Q_train_list[i])
                 solver.Add(Q_min <= Q_i)
             objective = Q_min
@@ -267,6 +262,44 @@ class LinearQualityFeatureSelector(AlternativeFeatureSelector):
         result['optimization_time'] = end_time - start_time
         result['optimization_status'] = optimization_status
         return result
+
+
+class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
+    """Feature Selection with Linear Quality Function
+
+    (Abstract) white-box feature selector whose objective function is the sum of the individual
+    features' qualities. This allows pre-computing the qualities when the data is set and re-using
+    these qualities for multiple selection/alternative-search runs. Subclasses need to define the
+    function for computing the qualities.
+    """
+
+    # Initialize all fields.
+    def __init__(self):
+        super().__init__()
+        self._q_train = None  # Iterable[float]; qualities of the individual features
+        self._q_test = None  # Iterable[float]; for evaluation only, not optimization
+
+    # Should return a sequence of qualities with len(result) == X.shape[1], i.e., one quality value
+    # for each feature.
+    @abstractmethod
+    def compute_qualities(self, X: pd.DataFrame, y: pd.Series) -> Iterable[float]:
+        raise NotImplementedError('Abstract method.')
+
+    # Set the data for the search for alternative feature sets and pre-compute the features'
+    # qualities for the objective.
+    def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
+                 y_test: pd.Series) -> None:
+        super().set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+        self._q_train = self.compute_qualities(X=X_train, y=y_train)
+        self._q_test = self.compute_qualities(X=X_test, y=y_test)
+
+    # Create linear train and test objectives from the features' qualities.
+    # See the superclass for a description of the parameters and the return value.
+    def create_objectives(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
+            -> Tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
+        return ([solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_train, s)]) for s in s_list],
+                [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_test, s)]) for s in s_list])
 
     # Greedy-replacement search for alternative feature sets. Optimal for univariate feature
     # qualities (objective: sum of them) as long a there are unused features. Works without solver.
@@ -347,6 +380,8 @@ class FCBFSelector(MISelector):
     Multivariate filter feature selector that uses mutual information between features and target as
     objective. Additionally, there are constraints on the mutual information between features (for
     each selected feature, dependency to target should be > than to each other selected feature).
+    Inspired by Yu et. al (2003): "Feature Selection for High-Dimensional Data: A Fast Correlation-
+    Based Filter Solution" (which searches heuristically rather than optimizing exactly).
     White-box optimization approach.
     """
 
@@ -371,8 +406,8 @@ class FCBFSelector(MISelector):
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]],
-                          objective_agg: str = 'sum') -> None:
-        super().initialize_solver(solver=solver, s_list=s_list, objective_agg=objective_agg)
+                          k: int, objective_agg: str = 'sum') -> None:
+        super().initialize_solver(solver=solver, s_list=s_list, k=k, objective_agg=objective_agg)
         # Note that the MI estimator in sklearn is not perfectly bivariate and symmetric, as it uses
         # *one* random-number generator to *iteratively* add some noise to *all* features and
         # target; e.g., if you re-order features in X, MI estimates change slightly, though the
@@ -407,6 +442,104 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
         return self._prediction_model.fit(X=X, y=y).feature_importances_
 
 
+class MRMRSelector(WhiteBoxFeatureSelector):
+    """Feature Selection with Minimal Redundancy Maximal Relevance
+
+    Multivariate filter feature selector that uses
+    1) mutual information between features and target as relevance criterion
+    2) mutual information between features as redundancy criterion
+    White-box optimization approach.
+
+    See Peng et al. (2005): "Feature Selection Based on Mutual Information: Criteria of
+    Max-Dependency, Max-Relevance, and Min-Redundancy".
+    """
+
+    # Initialize all fields.
+    def __init__(self):
+        super().__init__()
+        self._mi_target_train = None  # np.ndarray; feature-target dependencies
+        self._mi_target_test = None  # np.ndarray; feature-target dependencies
+        self._mi_features_train = None  # Sequence[np.ndarray]; feature-feature dependencies
+        self._mi_features_test = None  # Sequence[np.ndarray]; feature-feature dependencies
+
+    # Set the data that will be used during search for alternative feature sets. Pre-compute the
+    # feature-target and feature-feature dependencies that will be used for objective later.
+    def set_data(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
+                 y_test: pd.Series) -> None:
+        super().set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+        self._mi_target_train = MISelector.mutual_info(X=self._X_train, y=self._y_train)
+        self._mi_target_test = MISelector.mutual_info(X=self._X_test, y=self._y_test)
+        self._mi_features_train = [MISelector.mutual_info(X=self._X_train, y=self._X_train[feature])
+                                   for feature in self._X_train.columns]
+        self._mi_features_test = [MISelector.mutual_info(X=self._X_test, y=self._X_test[feature])
+                                  for feature in self._X_test.columns]
+        # Set self-redundancy to zero, to not penalize features for their intrinsic entropy (which
+        # can differ between features). See Ngyuen et al. (2014): "Effective Global Approaches for
+        # Mutual Information Based Feature Selection"
+        for j in range(self._n):
+            self._mi_features_train[j][j] = 0
+            self._mi_features_test[j][j] = 0
+        # Max-normalize MI values (min is 0 anyway, in theory due to definition of MI and in
+        # practice due to our self-redundancy fix above); to be consistent to the other feature
+        # selectors, normalize train and test with separate max values:
+        max_mi_train = max(self._mi_target_train.max(),
+                           max(x.max() for x in self._mi_features_train))
+        self._mi_target_train = self._mi_target_train / max_mi_train
+        self._mi_features_train = [x / max_mi_train for x in self._mi_features_train]
+        max_mi_test = max(self._mi_target_test.max(), max(x.max() for x in self._mi_features_test))
+        self._mi_target_test = self._mi_target_test / max_mi_test
+        self._mi_features_test = [x / max_mi_test for x in self._mi_features_test]
+
+    # Create objective by considering feature relevance and redundancy. Due to a special encoding of
+    # interaction terms (using real variables specific to training-set feature qualities instead of
+    # binary interaction variables), we cannot give a closed-form expression for the test objective
+    # here, but return the train objective twice and calculate the actual test objective in
+    # "select_and_evaluate()".
+    # See the superclass for a description of the parameters and the return value.
+    def create_objectives(self, solver: pywraplp.Solver,
+                          s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
+            -> Tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
+        objectives = []
+        for i, s in enumerate(s_list):
+            relevance = solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._mi_target_train, s)])
+            relevance = relevance / k
+            redundancy_terms = []
+            M = max(sum(x) for x in self._mi_features_train) + 1  # used to "deactivate" constraints
+            for j_1 in range(len(s)):
+                # Linearization: z_i = x_i * A_i(x) (follows Equation (14) in Nguyen et al. (2010)
+                # "Towards a Generic Feature-Selection Measure for Intrusion Detection" except there
+                # is no variable "y"; we have max instead of min objective, but since the redundancy
+                # term is subtracted (should be minimized), we can still use Equation (14))
+                z_j = solver.NumVar(name=f'z_{i}_{j_1}', lb=0, ub=M)
+                A_j = solver.Sum([self._mi_features_train[j_1][j_2] * s[j_2]
+                                  for j_2 in range(len(s))])
+                solver.Add(M * (s[j_1] - 1) + A_j <= z_j)
+                redundancy_terms.append(z_j)
+            redundancy = solver.Sum(redundancy_terms) / (k * (k - 1))  # -1 as self-redundancy == 0
+            objectives.append(relevance - redundancy)
+        return (objectives, objectives)  # no closed-form expression for test objective
+
+    # Compute the test-set objective for a given feature-selection "selected_idxs".
+    def compute_test_objective(self, selected_idxs: Sequence[int]) -> float:
+        k = len(selected_idxs)
+        if k == 0:
+            return float('nan')
+        relevance = sum(self._mi_target_test[j] for j in selected_idxs) / k
+        redundancy = sum(self._mi_features_test[j_1][j_2] for j_1 in selected_idxs
+                         for j_2 in selected_idxs) / (k * (k - 1))  # -1 since self-redundancy == 0
+        return relevance - redundancy
+
+    # Run feature-selection with the solver. Due to the reason described in "create_objectives()",
+    # we need to compute the test objectives manually.
+    # See the superclass for a description of the parameters and the return value.
+    def select_and_evaluate(self, solver: pywraplp.Solver,
+                            s_list: Sequence[Sequence[pywraplp.Variable]]) -> pd.DataFrame:
+        result = super().select_and_evaluate(solver=solver, s_list=s_list)
+        result['test_objective'] = [self.compute_test_objective(selected_idxs=selected_idxs)
+                                    for selected_idxs in result['selected_idxs']]
+        return result
+
+
 class GreedyWrapperSelector(AlternativeFeatureSelector):
     """Greedy Wrapper Feature Selection
 
@@ -424,13 +557,15 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
             prediction_model = prediction.create_model_for_fs()
         self._prediction_model = prediction_model
         self._max_iters = max_iters
+        self._objective_agg = None
 
     # Set a constant objective, as the solver should only check validity of solutions in this
     # approach (the actual objective, i.e., prediction performance, is a black box for the solver).
     # See the superclass for a description of the parameters.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]],
-                          objective_agg: str = 'sum') -> None:
+                          k: int, objective_agg: str = 'sum') -> None:
+        super().initialize_solver(solver=solver, s_list=s_list, k=k, objective_agg=objective_agg)
         self._objective_agg = objective_agg
         objective = 0
         solver.Maximize(objective)
@@ -443,10 +578,9 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                                new_Q_list: Iterable[float]) -> bool:
         if self._objective_agg == 'sum':
             return sum(new_Q_list) > sum(old_Q_list)
-        elif self._objective_agg == 'min':
+        if self._objective_agg == 'min':
             return min(new_Q_list) > min(old_Q_list)
-        else:
-            raise ValueError('Unknown objective aggregation.')
+        raise ValueError('Unknown objective aggregation.')
 
     # Run a greedy hill-climbing procedure to select features. In particular, start with a feature
     # set satisfying all constraints and systematically try flipping the selection decisions of

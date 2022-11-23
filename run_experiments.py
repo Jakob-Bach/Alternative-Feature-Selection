@@ -26,7 +26,7 @@ import prediction
 # alternatives (hard-coded below) and prediction models (queried from the module "prediction").
 N_FOLDS = 10  # cross-validation for search and predictions
 FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.GreedyWrapperSelector, afs.MISelector,
-                          afs.ModelImportanceSelector]
+                          afs.ModelImportanceSelector, afs.MRMRSelector]
 K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
 NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search (also yields all intermediate solutions)
 NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
