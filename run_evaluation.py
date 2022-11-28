@@ -115,12 +115,30 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\nHow is prediction performance distributed for different models?')
     print(results[prediction_metrics].describe().round(2).transpose())
 
-    print('\nWhat\'s the median overfitting (train-test difference)?')
-    results['objective_dif'] = results['train_objective'] - results['test_objective']
-    results['tree_mcc_dif'] = results['decision_tree_train_mcc'] - results['decision_tree_test_mcc']
-    print(results.groupby('fs_name')[['objective_dif', 'tree_mcc_dif']].median().round(2))
-    results.drop(columns=['objective_dif', 'tree_mcc_dif'], inplace=True)
+    # Figure 2a (arXiv version): Distribution of train-test difference
+    metric_pairs = {
+        'Q': ('train_objective', 'test_objective'),
+        '$MCC^{\\mathrm{tree}}$': ('decision_tree_train_mcc', 'decision_tree_test_mcc'),
+        '$MCC^{\\mathrm{forest}}$': ('random_forest_train_mcc', 'random_forest_test_mcc')
+    }
+    plot_results = results[['fs_name'] + quality_metrics].copy()
+    for metric, metric_pair in metric_pairs.items():
+        plot_results[metric] = plot_results[metric_pair[0]] - plot_results[metric_pair[1]]
+    plot_results = plot_results.melt(id_vars='fs_name', value_vars=list(metric_pairs.keys()),
+                                     var_name='Metric', value_name='Train-test difference')
+    plot_results['fs_name'] = plot_results['fs_name'].str.replace(
+        'GreedyWrapper', 'Greedy Wrapper').str.replace('ModelImportance', 'Model Gain')
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 16
+    sns.boxplot(x='Metric', y='Train-test difference', hue='fs_name', data=plot_results,
+                palette='Set2', fliersize=0)
+    plt.ylim(-0.6, 1.35)
+    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
+                     bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'evaluation-metrics-overfitting.pdf')
 
+    # Figure 2b (arXiv version): Correlation between evaluation metrics
     plot_results = results[quality_metrics].corr(method='spearman').round(2)
     name_mapping = {'train_objective': '$Q_{\\mathrm{train}}$',
                     'test_objective': '$Q_{\\mathrm{test}}$',
@@ -183,7 +201,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.yticks([0, 0.1, 0.2, 0.3, 0.4])
     plt.ylim(-0.05, 0.45)
     leg = plt.legend(title='Search', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
-                     columnspacing=1, framealpha=0, ncol=2)
+                     columnspacing=1, framealpha=0, ncols=2)
     leg.get_title().set_position((-117, -21))
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-stddev-objective.pdf')
@@ -205,7 +223,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.ylabel('Mean of $Q_{\\mathrm{train}}$')
     plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
     leg = plt.legend(title='Search', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
-                     columnspacing=1, framealpha=0, ncol=2)
+                     columnspacing=1, framealpha=0, ncols=2)
     leg.get_title().set_position((-117, -21))
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-mean-objective.pdf')
@@ -273,7 +291,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.ylabel('Normalized $Q_{\\mathrm{train}}$')
         plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
-                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncol=2)
+                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
         leg.get_title().set_position((-107, -21))
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-num-alternatives-objective-{normalization_name}.pdf')
