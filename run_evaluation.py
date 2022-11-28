@@ -79,18 +79,36 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n---- Datasets ----')
 
-    print('\nHow does median feature-set quality differ between datasets?')
+    print('\nHow does median feature-set quality (all experim. settings) differ between datasets?')
     print(results.groupby('dataset_name')[['train_objective', 'decision_tree_test_mcc']].median(
         ).describe().round(2))
 
-    print('\nHow does median feature-set quality differ between "n" (dataset dimensionality)?')
-    print(results.groupby('n')[['train_objective', 'decision_tree_test_mcc']].median().round(2))
-
-    print('\nHow does feature set-quality (Spearman-)correlate with "n"?')
+    print('\nHow does feature set-quality (all experim. settings)  (Spearman-)correlate with "n"?')
     print(results[quality_metrics].corrwith(results['n'], method='spearman').round(2))
 
-    print('\nHow does feature set-quality (Spearman-)correlate with "k"/"n"?')
+    print('\nHow does feature set-quality (all experim. settings) (Spearman-)correlate with "k/n"?')
     print(results[quality_metrics].corrwith(results['k'] / results['n'], method='spearman').round(2))
+
+    # Figure 1 (arXiv version): Impact of feature-set size "k" and dataet size "n"
+    plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
+                           (results['n_alternative'] == 0) & (results['fs_name'] == 'MI')].copy()
+    plot_results['k/n'] = plot_results['k'] / plot_results['n']
+    plot_metrics = ['train_objective', 'decision_tree_test_mcc']
+    plot_results = plot_results.groupby(['dataset_name', 'k', 'k/n'])[plot_metrics].mean(
+        ).reset_index()  # average over cross-validation folds (per dataset and k)
+    for metric in plot_metrics:
+        plt.figure(figsize=(4, 3))
+        plt.rcParams['font.size'] = 15
+        sns.scatterplot(x='k/n', y=metric, hue='k', style='k', data=plot_results, palette='Set2')
+        plt.ylabel('$Q_{\\mathrm{train}}$' if 'objective' in metric
+                   else '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$')
+        plt.ylim((-0.1, 1.1))
+        plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        leg = plt.legend(title='$k$', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
+                         columnspacing=1, handletextpad=0, framealpha=0, ncols=2)
+        leg.get_title().set_position((-70, -22))
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'impact-dataset-k-{metric.replace("_", "-")}.pdf')
 
     print('\n---- Prediction Models ----')
 
