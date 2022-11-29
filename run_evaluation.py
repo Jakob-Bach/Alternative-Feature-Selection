@@ -43,7 +43,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             (results['selected_idxs'].apply(len) == results['k'])).all()
     # Rename some values:
     results['fs_name'] = results['fs_name'].str.removesuffix('Selector')
-    results['search_name'] = results['search_name'].str.replace('(search_|ly)', '')
+    results['search_name'] = results['search_name'].str.replace('(search_|ly)', '', regex=True)
     results['optimization_status'].replace({0: 'Optimal', 1: 'Feasible', 2: 'Infeasible',
                                             6: 'Not solved'}, inplace=True)
     # Define columns for main experimental dimensions (corresponding to independent search runs):
@@ -191,7 +191,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                     index='num_alternatives', columns='search_name').round(3))
 
     plot_results = comparison_results.groupby(group_cols)['train_objective'].std().reset_index()
-    plot_results['search_name'] = plot_results['search_name'].str.replace('(uential|ultaneous)', '.')
+    plot_results['search_name'] = plot_results['search_name'].str.replace(
+        '(uential|ultaneous)', '.', regex=True)
     plt.figure(figsize=(4, 3))
     plt.rcParams['font.size'] = 15
     sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
@@ -214,7 +215,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                     index='num_alternatives', columns='search_name').round(2))
 
     plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index()
-    plot_results['search_name'] = plot_results['search_name'].str.replace('(uential|ultaneous)', '.')
+    plot_results['search_name'] = plot_results['search_name'].str.replace(
+        '(uential|ultaneous)', '.', regex=True)
     plt.figure(figsize=(4, 3))
     plt.rcParams['font.size'] = 15
     sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
