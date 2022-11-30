@@ -42,7 +42,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     assert ((results['train_objective'].isna() & (results['selected_idxs'].apply(len) == 0)) |
             (results['selected_idxs'].apply(len) == results['k'])).all()
     # Rename some values:
-    results['fs_name'] = results['fs_name'].str.removesuffix('Selector')
+    results['fs_name'] = results['fs_name'].str.removesuffix('Selector').replace(
+        {'GreedyWrapper': 'Greedy Wrapper', 'ModelImportance': 'Model Gain'})
+    fs_name_plot_order = ['MI', 'FCBF', 'Greedy Wrapper', 'Model Gain']
     results['search_name'] = results['search_name'].str.replace('(search_|ly)', '', regex=True)
     results['optimization_status'].replace({0: 'Optimal', 1: 'Feasible', 2: 'Infeasible',
                                             6: 'Not solved'}, inplace=True)
@@ -126,12 +128,10 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plot_results[metric] = plot_results[metric_pair[0]] - plot_results[metric_pair[1]]
     plot_results = plot_results.melt(id_vars='fs_name', value_vars=list(metric_pairs.keys()),
                                      var_name='Metric', value_name='Train-test difference')
-    plot_results['fs_name'] = plot_results['fs_name'].str.replace(
-        'GreedyWrapper', 'Greedy Wrapper').str.replace('ModelImportance', 'Model Gain')
     plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 16
+    plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Train-test difference', hue='fs_name', data=plot_results,
-                palette='Set2', fliersize=0)
+                palette='Set2', fliersize=0, hue_order=fs_name_plot_order)
     plt.ylim(-0.6, 1.35)
     leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
                      bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
@@ -153,21 +153,85 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.tight_layout()
     plt.savefig(plot_dir / 'evaluation-metrics-correlation.pdf')
 
+    print('\nHow do the evaluation metrics (Spearman-)correlate for different feature selectors',
+          'over all experimental settings?')
+    print(results.rename(columns={'decision_tree_test_mcc': 'tree_test_mcc'}).groupby('fs_name')[
+        ['train_objective', 'test_objective', 'tree_test_mcc']].corr(method='spearman').round(2))
+
     print('\n---- Feature-Selection Methods ----')
+
+    plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
+                           (results['n_alternative'] == 0)]
+
+    print('\nHow does prediction performance differ between feature-selection methods for the',
+          'original feature sets of sequential search?')
+    for metric in prediction_metrics:
+        print('\nMetric:', metric)
+        print(plot_results.groupby('fs_name')[metric].describe().round(2))
+
+    # Figure 3a (arXiv version): Impact of feature-set size "k" and feature selector on test MCC
+    plot_results = plot_results[['fs_name', 'k', 'decision_tree_test_mcc']].copy()
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 18
+    sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='Set2',
+                hue_order=fs_name_plot_order)
+    plt.ylabel('$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$')
+    plt.yticks([-0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1])
+    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
+                     bbox_to_anchor=(-0.3, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'impact-fs-method-k-decision-tree-test-mcc.pdf')
+
+    print('\nHow many iterations did wrapper search perform?')
+    print(results['wrapper_iters'].describe().round(2))
+
+    print('\nHow many iterations did sequential wrapper search perform?')
+    print(results[results['search_name'] == 'sequential'].groupby('n_alternative')[
+        'wrapper_iters'].describe().round(2))
+
+    print('\nHow many iterations did sequential wrapper search perform?')
+    print(results[results['search_name'] == 'simultaneous'].groupby('num_alternatives')[
+        'wrapper_iters'].describe().round(2))
 
     print('\nHow does the optimization status differ between feature-selection methods?')
     print(pd.crosstab(results['optimization_status'], results['fs_name'],
                       normalize='columns').applymap('{:.2%}'.format))
 
-    print('\nHow does prediction performance differ between feature-selection methods?')
-    for metric in prediction_metrics:
-        print('\nMetric:', metric)
-        print(results.groupby('fs_name')[metric].describe().round(2))
+    plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
+                           (results['n_alternative'] == 0)]
 
-    print('\nHow do the results differ between k on median?')
-    print(results.groupby('k')[['train_objective', 'decision_tree_test_mcc']].median().round(2))
-    print(results.groupby(['fs_name', 'k'])[['train_objective', 'decision_tree_test_mcc']].median(
-        ).round(2))
+    print('\nHow does the optimization status differ between feature-selection methods for the',
+          'original feature sets of sequential search?')
+    print(pd.crosstab(plot_results['optimization_status'], plot_results['fs_name'],
+                      normalize='columns').applymap('{:.2%}'.format))
+
+    # Figure 3b (arXiv version): Distribution of difference of metric between feature-set size "k"
+    metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+    plot_results = plot_results[['dataset_name', 'split_idx', 'fs_name', 'k'] + metrics].copy()
+    plot_results = plot_results.pivot(index=['dataset_name', 'split_idx', 'fs_name'], columns='k',
+                                      values=metrics).reset_index()
+    for metric in metrics:
+        plot_results[(metric, 'diff')] = plot_results[(metric, 10)] - plot_results[(metric, 5)]
+        plot_results.drop(columns=[(metric, 10), (metric, 5)], inplace=True)
+    plot_results = plot_results.droplevel(level='k', axis='columns')
+    plot_results = plot_results.melt(id_vars='fs_name', value_vars=metrics, var_name='Metric',
+                                     value_name='Difference')
+    plot_results['Metric'].replace(name_mapping, inplace=True)
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 18
+    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
+                hue_order=fs_name_plot_order)
+    plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
+    plt.ylim(-0.65, 0.65)
+    plt.yticks([-0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6])
+    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
+                     bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'impact-fs-method-k-metric-diff.pdf')
+
+    print('\nHow do the evaluation metrics differ between k=10 and k=5 on median for the original',
+          'feature sets of sequential search?')
+    print(plot_results.groupby(['Metric', 'fs_name']).median().round(2))
 
     print('\n---- Searching Alternatives ----')
 
@@ -242,18 +306,18 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nHow does the optimization status differ between search methods (excluding greedy FS,',
           'where the optimization status only describes the last solver run)?')
-    print(pd.crosstab(results.loc[results['fs_name'] != 'GreedyWrapper', 'optimization_status'],
-                      results.loc[results['fs_name'] != 'GreedyWrapper', 'search_name']))
-    print(pd.crosstab(results.loc[results['fs_name'] != 'GreedyWrapper', 'optimization_status'],
-                      results.loc[results['fs_name'] != 'GreedyWrapper', 'search_name'],
+    print(pd.crosstab(results.loc[results['fs_name'] != 'Greedy Wrapper', 'optimization_status'],
+                      results.loc[results['fs_name'] != 'Greedy Wrapper', 'search_name']))
+    print(pd.crosstab(results.loc[results['fs_name'] != 'Greedy Wrapper', 'optimization_status'],
+                      results.loc[results['fs_name'] != 'Greedy Wrapper', 'search_name'],
                       normalize='columns').applymap('{:.2%}'.format))
 
     print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
           'search (excluding greedy FS)?')
     print(pd.crosstab(results.loc[(results['search_name'] == 'simultaneous') &
-                                  (results['fs_name'] != 'GreedyWrapper'), 'optimization_status'],
+                                  (results['fs_name'] != 'Greedy Wrapper'), 'optimization_status'],
                       results.loc[(results['search_name'] == 'simultaneous') &
-                                  (results['fs_name'] != 'GreedyWrapper'), 'num_alternatives'],
+                                  (results['fs_name'] != 'Greedy Wrapper'), 'num_alternatives'],
                       normalize='columns').applymap('{:.2%}'.format))
 
     print('\n-- Number of Alternatives --')
