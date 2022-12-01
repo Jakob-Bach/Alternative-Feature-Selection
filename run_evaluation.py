@@ -13,6 +13,7 @@ import itertools
 import pathlib
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -54,6 +55,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # Define columns for evaluation metrics:
     quality_metrics = [x for x in results.columns if 'train' in x or 'test' in x]
     prediction_metrics = [x for x in results.columns if '_mcc' in x]
+    metric_name_mapping = {'train_objective': '$Q_{\\mathrm{train}}$',
+                           'test_objective': '$Q_{\\mathrm{test}}$',
+                           'decision_tree_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{tree}}$',
+                           'decision_tree_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$',
+                           'random_forest_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{forest}}$',
+                           'random_forest_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{forest}}$'}
     # Number the alternatives (however, they only have a natural order in sequential search)
     results['n_alternative'] = results.groupby(group_cols).cumcount()
 
@@ -102,13 +109,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.scatterplot(x='k/n', y=metric, hue='k', style='k', data=plot_results, palette='Set2')
-        plt.ylabel('$Q_{\\mathrm{train}}$' if 'objective' in metric
-                   else '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$')
+        plt.xlabel('Relative feature-set size $k/n$')
+        plt.ylabel(metric_name_mapping[metric])
         plt.ylim((-0.1, 1.1))
-        plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-        leg = plt.legend(title='$k$', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
-                         columnspacing=1, handletextpad=0, framealpha=0, ncols=2)
-        leg.get_title().set_position((-70, -22))
+        plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+        leg = plt.legend(title='Feature-set size $k$', edgecolor='white', loc='upper left', ncols=2,
+                         bbox_to_anchor=(0.3, -0.1),  columnspacing=1, handletextpad=0, framealpha=0)
+        leg.get_title().set_position((-124, -22))
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-dataset-k-{metric.replace("_", "-")}.pdf')
 
@@ -140,13 +147,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     # Figure 2b (arXiv version): Correlation between evaluation metrics
     plot_results = results[quality_metrics].corr(method='spearman').round(2)
-    name_mapping = {'train_objective': '$Q_{\\mathrm{train}}$',
-                    'test_objective': '$Q_{\\mathrm{test}}$',
-                    'decision_tree_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{tree}}$',
-                    'decision_tree_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$',
-                    'random_forest_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{forest}}$',
-                    'random_forest_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{forest}}$'}
-    plot_results.rename(columns=name_mapping, index=name_mapping, inplace=True)
+    plot_results.rename(columns=metric_name_mapping, index=metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 16
     sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
@@ -170,13 +171,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         print(plot_results.groupby('fs_name')[metric].describe().round(2))
 
     # Figure 3a (arXiv version): Impact of feature-set size "k" and feature selector on test MCC
-    plot_results = plot_results[['fs_name', 'k', 'decision_tree_test_mcc']].copy()
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='Set2',
                 hue_order=fs_name_plot_order)
-    plt.ylabel('$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$')
-    plt.yticks([-0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1])
+    plt.xlabel('Feature-set size $k$')
+    plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
+    plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
     leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
                      bbox_to_anchor=(-0.3, -0.2), alignment='left', columnspacing=1, framealpha=0)
     plt.tight_layout()
@@ -216,14 +217,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results = plot_results.droplevel(level='k', axis='columns')
     plot_results = plot_results.melt(id_vars='fs_name', value_vars=metrics, var_name='Metric',
                                      value_name='Difference')
-    plot_results['Metric'].replace(name_mapping, inplace=True)
+    plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
                 hue_order=fs_name_plot_order)
     plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.65, 0.65)
-    plt.yticks([-0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6])
+    plt.yticks(np.arange(start=-0.6, stop=0.7, step=0.2))
     leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
                      bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
     plt.tight_layout()
@@ -237,87 +238,148 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Search Method --')
 
-    comparison_results = results[results['search_name'] == 'simultaneous']
+    comparison_results = results[(results['search_name'] == 'simultaneous') & (results['k'] == 5)]
     for num_alternatives in results.loc[results['search_name'] == 'simultaneous',
                                         'num_alternatives'].unique():
         # Extract first "num_alternatives + 1" feature sets (sequential search is only run for one
         # value of "num_alternatives", but you can get "smaller" results by subsetting)
-        seq_results = results[results['search_name'] == 'sequential'].groupby(group_cols).nth(
-            range(0, num_alternatives + 1)).reset_index()
+        seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 5) &
+                              (results['n_alternative'] <= num_alternatives)].copy()
         seq_results['num_alternatives'] = num_alternatives
         comparison_results = pd.concat([comparison_results, seq_results])
 
-    print('\nHow does the standard deviation of feature-set quality within results from one search',
-          'depend on search methods and number of alternatives (on median)?')
+    # Figures 4a, 4c, 4e (arXiv version): Impact of search method on stddev of metrics
     for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
-        print(comparison_results.groupby(group_cols)[metric].std().reset_index().groupby(
-                ['search_name', 'num_alternatives'])[metric].median().reset_index().pivot(
-                    index='num_alternatives', columns='search_name').round(3))
+        plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
+        plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
+        plot_results['search_name'] = plot_results['search_name'].str.replace(
+            '(uential|ultaneous)', '.', regex=True)
+        plt.figure(figsize=(4, 3))
+        plt.rcParams['font.size'] = 15
+        sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
+                    palette='Set2', fliersize=0)
+        plt.xlabel('Number of alternatives $a$')
+        plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
+        plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
+        plt.ylim(-0.05, 0.35)
+        leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
+                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
+        leg.get_title().set_position((-117, -21))
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
-    plot_results = comparison_results.groupby(group_cols)['train_objective'].std().reset_index()
-    plot_results['search_name'] = plot_results['search_name'].str.replace(
-        '(uential|ultaneous)', '.', regex=True)
-    plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 15
-    sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
-                palette='Set2', fliersize=0)
-    plt.xlabel('Number of alternatives')
-    plt.ylabel('$\\sigma$ of $Q_{\\mathrm{train}}$')
-    plt.yticks([0, 0.1, 0.2, 0.3, 0.4])
-    plt.ylim(-0.05, 0.45)
-    leg = plt.legend(title='Search', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
-                     columnspacing=1, framealpha=0, ncols=2)
-    leg.get_title().set_position((-117, -21))
+    print('\nHow does the standard deviation of the training-set objective within results from one',
+          'search (with k=5) depend on the feature-selection method, search method, and number of',
+          'alternatives (on median)?')
+    print(comparison_results.groupby(group_cols)['train_objective'].std().reset_index().groupby(
+        ['fs_name', 'search_name', 'num_alternatives'])['train_objective'].median().reset_index(
+            ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
+
+    # Figures 4b, 4d, 4f (arXiv version): Impact of search method on mean objective
+    for metric, ylim, min_tick in zip(
+            ['train_objective', 'test_objective', 'decision_tree_test_mcc'],
+            [(-0.05, 1.05), (-0.05, 0.65), (-0.3, 1.05)], [0, 0, -0.2]):
+        plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
+        plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
+        plot_results['search_name'] = plot_results['search_name'].str.replace(
+            '(uential|ultaneous)', '.', regex=True)
+        plt.figure(figsize=(4, 3))
+        plt.rcParams['font.size'] = 15
+        sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
+                    palette='Set2', fliersize=0)
+        plt.xlabel('Number of alternatives $a$')
+        plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
+        plt.ylim(ylim)
+        plt.yticks(np.arange(start=min_tick, stop=ylim[1], step=0.2))
+        leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
+                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
+        leg.get_title().set_position((-117, -21))
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'impact-search-mean-{metric.replace("_", "-")}.pdf')
+
+    print('\nHow does the mean of the training-set objective within results from one search',
+          '(with k=5) depend on the feature-selection method, search method, and number of',
+          'alternatives (on median)?')
+    print(comparison_results.groupby(group_cols)['train_objective'].mean().reset_index().groupby(
+        ['fs_name', 'search_name', 'num_alternatives'])['train_objective'].median().reset_index(
+            ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
+
+    # Figure 5a (arXiv version): Impact of search method and feature selector on test MCC
+    plot_results = comparison_results[group_cols + ['decision_tree_test_mcc']].copy()
+    plot_results = plot_results.groupby(group_cols)['decision_tree_test_mcc'].mean().reset_index()
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 18
+    sns.boxplot(x='search_name', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
+                palette='Set2', hue_order=fs_name_plot_order)
+    plt.xlabel('Search')
+    plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
+    plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
+    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
+                     bbox_to_anchor=(-0.3, -0.2), alignment='left', columnspacing=1, framealpha=0)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'impact-search-stddev-objective.pdf')
+    plt.savefig(plot_dir / 'impact-search-fs-method-decision-tree-test-mcc.pdf')
 
-    print('\nHow does the average of feature-set quality within results from one search',
-          'depend on search methods and number of alternatives (on median)?')
-    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
-        print(comparison_results.groupby(group_cols)[metric].mean().reset_index().groupby(
-                ['search_name', 'num_alternatives'])[metric].mean().reset_index().pivot(
-                    index='num_alternatives', columns='search_name').round(2))
+    print('\nWhat is the median of the average feature-set quality difference "simultaneous search',
+          'minus sequential search" (with k=5; each comparison for the same search setting)?')
+    plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index(
+        ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
+                values='train_objective').reset_index()
+    plot_results['sim - seq'] = plot_results['simultaneous'] - plot_results['sequential']
+    print(plot_results.groupby(['fs_name', 'num_alternatives'])['sim - seq'].median().round(3))
 
-    plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index()
-    plot_results['search_name'] = plot_results['search_name'].str.replace(
-        '(uential|ultaneous)', '.', regex=True)
-    plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 15
-    sns.boxplot(x='num_alternatives', y='train_objective', hue='search_name', data=plot_results,
-                palette='Set2', fliersize=0)
-    plt.xlabel('Number of alternatives')
-    plt.ylabel('Mean of $Q_{\\mathrm{train}}$')
-    plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    leg = plt.legend(title='Search', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
-                     columnspacing=1, framealpha=0, ncols=2)
-    leg.get_title().set_position((-117, -21))
+    # Figure 5b: Distribution of difference of metrics between search methods
+    metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+    plot_results = comparison_results.groupby(group_cols)[metrics].mean().reset_index(
+        ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
+                values=metrics).reset_index()
+    for metric in metrics:
+        plot_results[(metric, 'diff')] = (plot_results[(metric, 'simultaneous')] -
+                                          plot_results[(metric, 'sequential')])
+        plot_results.drop(columns=[(metric, 'sequential'), (metric, 'simultaneous')], inplace=True)
+    plot_results = plot_results.droplevel(level='search_name', axis='columns')
+    plot_results = plot_results.melt(id_vars='fs_name', value_vars=metrics, var_name='Metric',
+                                     value_name='Difference')
+    plot_results['Metric'].replace(metric_name_mapping, inplace=True)
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 18
+    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
+                hue_order=fs_name_plot_order)
+    plt.ylabel('Difference sim. vs. seq.', y=0.45)  # moved a bit downwards to fit on plot
+    plt.ylim(-0.45, 0.35)
+    plt.yticks(np.arange(start=-0.4, stop=0.4, step=0.1))
+    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
+                     bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'impact-search-mean-objective.pdf')
+    plt.savefig(plot_dir / 'impact-search-fs-method-metric-diff.pdf')
 
-    print('\nHow is the difference in average feature-set quality between simultaneous search and',
-          'sequential search (each comparison for the same search setting) distributed?')
-    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
-        reshaped_comparison_results = comparison_results.groupby(group_cols)[metric].mean(
-            ).reset_index().pivot(index=[x for x in group_cols if x != 'search_name'],
-                                  columns='search_name', values=metric)
-        print('\nMetric:', metric)
-        print((reshaped_comparison_results['simultaneous'] -
-               reshaped_comparison_results['sequential']).describe().round(2))
-
-    print('\nHow does the optimization status differ between search methods (excluding greedy FS,',
-          'where the optimization status only describes the last solver run)?')
-    print(pd.crosstab(results.loc[results['fs_name'] != 'Greedy Wrapper', 'optimization_status'],
-                      results.loc[results['fs_name'] != 'Greedy Wrapper', 'search_name']))
-    print(pd.crosstab(results.loc[results['fs_name'] != 'Greedy Wrapper', 'optimization_status'],
-                      results.loc[results['fs_name'] != 'Greedy Wrapper', 'search_name'],
-                      normalize='columns').applymap('{:.2%}'.format))
+    print('\nHow often does each optimization status occurr for each combination of search method',
+          '(with k=5 and 1-5 alternatives) and feature selector (excluding greedy, where status',
+          'only describes last solver run)?')
+    # While sequential search has one optimization status per feature set (as they are found
+    # separately), simultaneous search has same status for multiple feature sets; to not bias
+    # analysis towards higher humber of alternatives, we only extract one status per sim. search
+    assert ((comparison_results.loc[comparison_results['search_name'] == 'simultaneous'].groupby(
+        group_cols)['optimization_status'].nunique() == 1).all())
+    plot_results = pd.concat([
+        comparison_results.loc[
+            comparison_results['search_name'] == 'sequential',
+            ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
+        ],
+        comparison_results[comparison_results['search_name'] == 'simultaneous'].groupby(
+            group_cols).first().reset_index()[
+                ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
+        ]
+    ])
+    plot_results = plot_results[plot_results['fs_name'] != 'Greedy Wrapper']
+    print(plot_results.groupby(['fs_name', 'search_name'])['optimization_status'].value_counts(
+        normalize=True).round(4).apply('{:.2%}'.format))
 
     print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
-          'search (excluding greedy FS)?')
-    print(pd.crosstab(results.loc[(results['search_name'] == 'simultaneous') &
-                                  (results['fs_name'] != 'Greedy Wrapper'), 'optimization_status'],
-                      results.loc[(results['search_name'] == 'simultaneous') &
-                                  (results['fs_name'] != 'Greedy Wrapper'), 'num_alternatives'],
+          'search (with k=5 and excluding greedy FS)?')
+    print(pd.crosstab(plot_results.loc[plot_results['search_name'] == 'simultaneous',
+                                       'optimization_status'],
+                      plot_results.loc[plot_results['search_name'] == 'simultaneous',
+                                       'num_alternatives'],
                       normalize='columns').applymap('{:.2%}'.format))
 
     print('\n-- Number of Alternatives --')
