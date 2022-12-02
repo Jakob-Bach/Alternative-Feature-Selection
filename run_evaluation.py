@@ -75,14 +75,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n---- Datasets ----')
 
+    # Table 1 (arXiv version)
+    print('\nTable: Dataset overview\n')
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
     dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': 'm',
                                      'n_features': 'n'}, inplace=True)
     dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('GAMETES', 'G')
     dataset_overview.sort_values(by='Dataset', key=lambda x: x.str.lower(), inplace=True)
-    with pd.option_context('max_colwidth', 1000):  # avoid truncation
-        print(dataset_overview.to_latex(index=False))
+    print(dataset_overview.style.format(escape='latex').hide(axis='index').to_latex(hrules=True))
 
     print('\n------ Evaluation ------')
 
@@ -374,6 +375,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(plot_results.groupby(['fs_name', 'search_name'])['optimization_status'].value_counts(
         normalize=True).round(4).apply('{:.2%}'.format))
 
+    # Table 3 (arXiv version)
+    print('\nTable: Impact of search and feature selector on optimization status\n')
+    print_results = (plot_results.groupby(['fs_name', 'search_name'])[
+        'optimization_status'].value_counts(normalize=True) * 100).rename('Frequency').reset_index()
+    print_results = print_results.pivot(index=['fs_name', 'search_name'], values='Frequency',
+                                        columns='optimization_status').fillna(0).reset_index()
+    status_order = ['Infeasible', 'Not solved', 'Feasible', 'Optimal']
+    print_results = print_results[print_results.columns[:2].tolist() + status_order]
+    print(print_results.style.format('{:.2f}\\%'.format, subset=status_order).hide(
+        axis='index').to_latex(hrules=True))
+
     print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
           'search (with k=5 and excluding greedy FS)?')
     print(pd.crosstab(plot_results.loc[plot_results['search_name'] == 'simultaneous',
@@ -381,6 +393,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                       plot_results.loc[plot_results['search_name'] == 'simultaneous',
                                        'num_alternatives'],
                       normalize='columns').applymap('{:.2%}'.format))
+
+    # Table 4 (arXiv version)
+    print('\nTable: Impact of number of alternatives on sim-search optimization status\n')
+    print_results = plot_results[plot_results['search_name'] == 'simultaneous']
+    print_results = (print_results.groupby('num_alternatives')['optimization_status'].value_counts(
+        normalize=True) * 100).rename('Frequency').reset_index()
+    print_results = print_results.pivot(index='num_alternatives', values='Frequency',
+                                        columns='optimization_status').fillna(0).reset_index()
+    print_results = print_results[[print_results.columns[0]] + status_order]
+    print(print_results.style.format('{:.2f}\\%'.format, subset=status_order).hide(
+        axis='index').to_latex(hrules=True))
 
     print('\n-- Number of Alternatives --')
 
