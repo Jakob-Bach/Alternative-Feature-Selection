@@ -407,8 +407,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Number of Alternatives --')
 
-    seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 10)]
-    sim_results = results[(results['search_name'] == 'simultaneous') & (results['k'] == 10)]
+    seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 5)]
     normalization_funcs = {'max': lambda x: x / x.max(),
                            'min-max': lambda x: (x - x.min()) / (x.max() - x.min())}
 
@@ -423,23 +422,23 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             normalization_func)  # applies function to each column independently
 
         print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
-              'experimental setting) develop over the iterations of sequential search (k=10)?')
+              'experimental setting) develop over the iterations of sequential search (k=5)?')
         for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
             print('\nMetric:', metric)
             print(norm_results.groupby(['n_alternative', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='n_alternative', columns='fs_name').round(2))
 
+        # Figure 6a-6d (arXiv version): Impact of number of alternatives on objective value
         plot_results = norm_results[(norm_results['fs_name'] == 'MI')].melt(
             id_vars=['n_alternative'], value_vars=['train_objective', 'test_objective'],
             var_name='split', value_name='objective')
         plot_results['split'] = plot_results['split'].str.replace('_objective', '')
-
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='n_alternative', y='objective', hue='split', data=plot_results,
-                    palette='Set2', fliersize=0)
+                    palette='Set2', fliersize=1)
         plt.xlabel('Number of alternative')
-        plt.ylabel('Normalized $Q_{\\mathrm{train}}$')
+        plt.ylabel('Normalized $Q$')
         plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
                          bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
@@ -447,25 +446,30 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-num-alternatives-objective-{normalization_name}.pdf')
 
-    print('\nHow does the optimization status differ between the number of alternatives in',
-          'sequential search (k=10) for MI feature selection?')
-    print(pd.crosstab(seq_results.loc[seq_results['fs_name'] == 'MI', 'n_alternative'],
-                      seq_results.loc[seq_results['fs_name'] == 'MI', 'optimization_status'],
-                      normalize='index').applymap('{:.2%}'.format))
+        if func_name == 'min-max':  # with pure max normalization, large negative values can occur
+            # Figures 6e, 6f (arXiv version): Impact of number of alternatives on test MCC
+            metric = 'decision_tree_test_mcc'
+            plot_results = norm_results[norm_results['fs_name'] == 'MI']
+            plt.figure(figsize=(4, 3))
+            plt.rcParams['font.size'] = 15
+            sns.boxplot(x='n_alternative', y=metric, data=plot_results,
+                        color=sns.color_palette('Set2').as_hex()[1], fliersize=1)
+            plt.xlabel('Number of alternative')
+            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+            plt.tight_layout()
+            plt.savefig(plot_dir / (f'impact-num-alternatives-{metric.replace("_", "-")}-' +
+                                    f'{normalization_name}.pdf'))
 
-    print('\nHow does the median train objective (max-normalized per experimental setting) develop',
-          'over the number of alternatives in simultaneous search (k=10)?')
-    norm_results = sim_results[group_cols + ['train_objective']].copy()
-    norm_results['train_objective'] = norm_results.groupby(group_cols)['train_objective'].transform(
-        normalization_funcs['max'])
-    print(norm_results.groupby(['num_alternatives', 'fs_name'])['train_objective'].median(
-        ).reset_index().pivot(index='num_alternatives', columns='fs_name').round(2))
-
-    print('\nHow does the optimization status differ between the number of alternatives in',
-          'simultaneous search (k=10) for MI feature selection?')
-    print(pd.crosstab(sim_results.loc[sim_results['fs_name'] == 'MI', 'num_alternatives'],
-                      sim_results.loc[sim_results['fs_name'] == 'MI', 'optimization_status'],
-                      normalize='index').applymap('{:.2%}'.format))
+    for k in results['k'].unique():
+        print('\nHow does the optimization status differ between the number of alternatives in',
+              f'sequential search (with k={k}) for MI feature selection?')
+        print(pd.crosstab(
+            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'sequential') &
+                        (results['k'] == k), 'n_alternative'],
+            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'sequential') &
+                        (results['k'] == k), 'optimization_status'],
+            normalize='index').applymap('{:.2%}'.format))
 
     print('\n-- Dissimilarity Threshold --')
 
@@ -523,14 +527,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(pd.crosstab(seq_results.loc[seq_results['fs_name'] == 'MI', 'tau_abs'],
                       seq_results.loc[seq_results['fs_name'] == 'MI', 'optimization_status'],
                       normalize='index').applymap('{:.2%}'.format))
-
-    print('\nHow does the median train objective (max-normalized per experimental setting) develop',
-          'over "tau" for different feature selectors in simultaneous search (k=10)?')
-    norm_results = sim_results[group_cols + ['train_objective']].copy()
-    norm_results['train_objective'] = norm_results.groupby(group_cols)['train_objective'].transform(
-        normalization_funcs['max'])
-    print(norm_results.groupby(['tau_abs', 'fs_name'])['train_objective'].median().reset_index(
-        ).pivot(index='tau_abs', columns='fs_name').round(2))
 
     print('\nHow many new features occur in a feature set from one alternative to next in',
           'sequential search (k=10) for MI as feature selector?')
