@@ -139,8 +139,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Train-test difference', hue='fs_name', data=plot_results,
-                palette='Set2', fliersize=0, hue_order=fs_name_plot_order)
-    plt.ylim(-0.6, 1.35)
+                palette='Set2', fliersize=1, hue_order=fs_name_plot_order)
+    plt.ylim(-0.55, 1.35)
+    plt.yticks(np.arange(start=-0.4, stop=1.3, step=0.2))
     leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
                      bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
     plt.tight_layout()
@@ -175,7 +176,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='Set2',
-                hue_order=fs_name_plot_order)
+                fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Feature-set size $k$')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
@@ -222,7 +223,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
-                hue_order=fs_name_plot_order)
+                fliersize=1, hue_order=fs_name_plot_order)
     plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.65, 0.65)
     plt.yticks(np.arange(start=-0.6, stop=0.7, step=0.2))
@@ -258,7 +259,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=0)
+                    palette='Set2', fliersize=1)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
@@ -287,7 +288,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=0)
+                    palette='Set2', fliersize=1)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
         plt.ylim(ylim)
@@ -311,7 +312,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='search_name', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
-                palette='Set2', hue_order=fs_name_plot_order)
+                palette='Set2', fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Search')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
@@ -344,7 +345,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
-                hue_order=fs_name_plot_order)
+                fliersize=1, hue_order=fs_name_plot_order)
     plt.ylabel('Difference sim. vs. seq.', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.45, 0.35)
     plt.yticks(np.arange(start=-0.4, stop=0.4, step=0.1))
