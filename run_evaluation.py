@@ -13,6 +13,7 @@ import itertools
 import pathlib
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -209,15 +210,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                       normalize='columns').applymap('{:.2%}'.format))
 
     # Figure 3b (arXiv version): Distribution of difference of metric between feature-set size "k"
-    metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
-    plot_results = plot_results[['dataset_name', 'split_idx', 'fs_name', 'k'] + metrics].copy()
+    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+    plot_results = plot_results[['dataset_name', 'split_idx', 'fs_name', 'k'] + plot_metrics].copy()
     plot_results = plot_results.pivot(index=['dataset_name', 'split_idx', 'fs_name'], columns='k',
-                                      values=metrics).reset_index()
-    for metric in metrics:
+                                      values=plot_metrics).reset_index()
+    for metric in plot_metrics:
         plot_results[(metric, 'diff')] = plot_results[(metric, 10)] - plot_results[(metric, 5)]
         plot_results.drop(columns=[(metric, 10), (metric, 5)], inplace=True)
     plot_results = plot_results.droplevel(level='k', axis='columns')
-    plot_results = plot_results.melt(id_vars='fs_name', value_vars=metrics, var_name='Metric',
+    plot_results = plot_results.melt(id_vars='fs_name', value_vars=plot_metrics, var_name='Metric',
                                      value_name='Difference')
     plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
@@ -330,16 +331,16 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(plot_results.groupby(['fs_name', 'num_alternatives'])['sim - seq'].median().round(3))
 
     # Figure 5b: Distribution of difference of metrics between search methods
-    metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
-    plot_results = comparison_results.groupby(group_cols)[metrics].mean().reset_index(
+    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+    plot_results = comparison_results.groupby(group_cols)[plot_metrics].mean().reset_index(
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
-                values=metrics).reset_index()
-    for metric in metrics:
+                values=plot_metrics).reset_index()
+    for metric in plot_metrics:
         plot_results[(metric, 'diff')] = (plot_results[(metric, 'simultaneous')] -
                                           plot_results[(metric, 'sequential')])
         plot_results.drop(columns=[(metric, 'sequential'), (metric, 'simultaneous')], inplace=True)
     plot_results = plot_results.droplevel(level='search_name', axis='columns')
-    plot_results = plot_results.melt(id_vars='fs_name', value_vars=metrics, var_name='Metric',
+    plot_results = plot_results.melt(id_vars='fs_name', value_vars=plot_metrics, var_name='Metric',
                                      value_name='Difference')
     plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
@@ -411,25 +412,26 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 5)]
     normalization_funcs = {'max': lambda x: x / x.max(),
                            'min-max': lambda x: (x - x.min()) / (x.max() - x.min())}
+    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
 
     for (func_name, normalization_func), fillna in itertools.product(
             normalization_funcs.items(), (False, True)):
-        norm_results = seq_results[group_cols + quality_metrics + ['n_alternative']].copy()
+        norm_results = seq_results[group_cols + plot_metrics + ['n_alternative']].copy()
         normalization_name = func_name
         if fillna:  # not all metrics have 0 as theoretical minimum, but it suffices for analysis
-            norm_results[quality_metrics] = norm_results[quality_metrics].fillna(0)
+            norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
             normalization_name += '-fillna'
-        norm_results[quality_metrics] = norm_results.groupby(group_cols)[quality_metrics].apply(
+        norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
             normalization_func)  # applies function to each column independently
 
         print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
               'experimental setting) develop over the iterations of sequential search (k=5)?')
-        for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
+        for metric in plot_metrics:
             print('\nMetric:', metric)
             print(norm_results.groupby(['n_alternative', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='n_alternative', columns='fs_name').round(2))
 
-        # Figure 6a-6d (arXiv version): Impact of number of alternatives on objective value
+        # Figures 6a-6d (arXiv version): Impact of number of alternatives on objective value
         plot_results = norm_results[(norm_results['fs_name'] == 'MI')].melt(
             id_vars=['n_alternative'], value_vars=['train_objective', 'test_objective'],
             var_name='split', value_name='objective')
@@ -440,7 +442,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                     palette='Set2', fliersize=1)
         plt.xlabel('Number of alternative')
         plt.ylabel('Normalized $Q$')
-        plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
         leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
                          bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
         leg.get_title().set_position((-107, -21))
@@ -474,60 +476,96 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Dissimilarity Threshold --')
 
-    for fillna in (False, True):
-        norm_results = seq_results[group_cols + quality_metrics + ['n_alternative']].copy()
-        normalization_name = 'max'
-        if fillna:  # not all metrics have 0 as theoretical minimum, but it suffices for analysis
-            norm_results[quality_metrics] = norm_results[quality_metrics].fillna(0)
-            normalization_name += '-fillna'
-        norm_results[quality_metrics] = norm_results.groupby(group_cols)[quality_metrics].apply(
-            normalization_funcs['max'])
+    # Here, we use k=10 instead of k=5 to have more distinct values of "tau" (10 instead of 5)
+    seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 10)]
 
-        print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per ',
-              'experimental setting) develop over the iterations and "tau" of sequential search ',
+    for (func_name, normalization_func), fillna in itertools.product(
+            normalization_funcs.items(), (False, True)):
+        if func_name == 'max':
+            plot_metrics = ['train_objective', 'test_objective']
+        else:
+            plot_metrics = ['decision_tree_test_mcc']
+        norm_results = seq_results[group_cols + plot_metrics + ['n_alternative']].copy()
+        normalization_name = func_name
+        if fillna:  # not all metrics have 0 as theoretical minimum, but it suffices for analysis
+            norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
+            normalization_name += '-fillna'
+        norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
+            normalization_func)  # applies function to each column independently
+
+        print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
+              'experimental setting) develop over the iterations and "tau" of sequential search',
               '(k=10) for MI feature selection?')
-        for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
+        for metric in plot_metrics:
             print(norm_results[norm_results['fs_name'] == 'MI'].groupby(
                 ['n_alternative', 'tau_abs'])[metric].median().reset_index(
                 ).pivot(index='n_alternative', columns='tau_abs').round(2))
 
-        print('\nHow does the median feature-set quality ({normalization_name}-normalized per ',
-              'experimental setting)  develop over "tau" for different feature selectors in ',
+        print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
+              'experimental setting) develop over "tau" for different feature selectors in',
               'sequential search (k=10)?')
-        for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
+        for metric in plot_metrics:
             print(norm_results.groupby(['tau_abs', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='tau_abs', columns='fs_name').round(2))
 
-        for split in ('train', 'test'):
+        for metric in plot_metrics:
+            # Figures 7a-7f (arXiv version): Impact of number of alternatives and "tau" on
+            # feature-set quality
             plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
-                ['n_alternative', 'tau_abs'])[f'{split}_objective'].mean().reset_index()
+                ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
             plot_results['tau'] = plot_results['tau_abs'] / 10
-
             plt.figure(figsize=(4, 3))
             plt.rcParams['font.size'] = 15
-            sns.lineplot(x='n_alternative', y=f'{split}_objective', hue='tau',
-                         data=plot_results, palette='RdPu', hue_norm=(-0.2, 1), legend=False)
+            sns.lineplot(x='n_alternative', y=metric, hue='tau', data=plot_results, palette='RdPu',
+                         hue_norm=(-0.2, 1), legend=False)
             # Use color scale instead of standard line plot legend; start color scaling at -0.2 such
             # that the color for the actual lowest value (tau=0) is more readable (darker):
-            cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(
+            cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
                 cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
             cbar.ax.invert_yaxis()  # put low values at top (like most lines are ordered)
             cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
-            cbar.ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1])
+            cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
             plt.xlabel('Number of alternative')
-            plt.ylabel('Normalized $Q_{\\mathrm{' + split + '}}$')
+            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
             plt.xticks(range(0, 11, 1))
-            plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
             plt.ylim(-0.05, 1.05)
             plt.tight_layout()
-            plt.savefig(plot_dir / (f'impact-num-alternatives-{split}-objective-' +
-                                    f'{normalization_name}-tau.pdf'))
+            plt.savefig(plot_dir / (f'impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
+                                    f'{normalization_name}.pdf'))
 
-    print('\nHow does the optimization status differ between the dissimilarity thresholds in',
-          'sequential search (k=10) for MI feature selection?')
-    print(pd.crosstab(seq_results.loc[seq_results['fs_name'] == 'MI', 'tau_abs'],
-                      seq_results.loc[seq_results['fs_name'] == 'MI', 'optimization_status'],
-                      normalize='index').applymap('{:.2%}'.format))
+    for k in results['k'].unique():
+        plot_results = results[(results['fs_name'] == 'MI') & (results['k'] == k) &
+                               (results['search_name'] == 'sequential')]
+
+        print('\nHow does the optimization status differ between the dissimilarity thresholds in',
+              f'sequential search (with k={k}) for MI feature selection?')
+        print(pd.crosstab(plot_results['tau_abs'], plot_results['optimization_status'],
+                          normalize='index').applymap('{:.2%}'.format))
+
+        # Figures 8a, 8b (arXiv version): Impact of number of alternatives and "tau" on
+        # optimization status
+        assert plot_results['optimization_status'].isin(['Infeasible', 'Optimal']).all()
+        plot_results = plot_results.groupby(['tau_abs', 'n_alternative'])[
+            'optimization_status'].agg(lambda x: (x == 'Optimal').sum() / len(x)).reset_index()
+        plot_results['tau'] = plot_results['tau_abs'] / k
+        plt.figure(figsize=(4, 3))
+        plt.rcParams['font.size'] = 15
+        sns.lineplot(x='n_alternative', y='optimization_status', hue='tau', data=plot_results,
+                     palette='RdPu', hue_norm=(-0.2, 1), legend=False)
+        cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
+            cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
+        cbar.ax.invert_yaxis()  # put low values at top (like most lines are ordered)
+        cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
+        cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
+        plt.xlabel('Number of alternative')
+        plt.ylabel('Valid feature sets')
+        plt.xticks(range(0, 11, 1))
+        plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+        plt.gca().yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
+        plt.ylim(-0.05, 1.05)
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'impact-num-alternatives-tau-optimization-status-k-{k}.pdf')
 
     print('\nHow many new features occur in a feature set from one alternative to next in',
           'sequential search (k=10) for MI as feature selector?')
