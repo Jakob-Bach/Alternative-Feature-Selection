@@ -100,7 +100,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\nHow does feature set-quality (all experim. settings) (Spearman-)correlate with "k/n"?')
     print(results[quality_metrics].corrwith(results['k'] / results['n'], method='spearman').round(2))
 
-    # Figure 1 (arXiv version): Impact of feature-set size "k" and dataet size "n"
+    # Figure 1 (arXiv version): Impact of feature-set size "k" and dataset size "n"
     plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
                            (results['n_alternative'] == 0) & (results['fs_name'] == 'MI')].copy()
     plot_results['k/n'] = plot_results['k'] / plot_results['n']
@@ -406,6 +406,41 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print_results = print_results[[print_results.columns[0]] + status_order]
     print(print_results.style.format('{:.2f}\\%'.format, subset=status_order).hide(
         axis='index').to_latex(hrules=True))
+
+    print('\nHow does the optimization time depend on the feature selectors in sequential search',
+          '(with k=5)?')
+    print(results[(results['search_name'] == 'sequential') & (results['k'] == 5)].groupby(
+        'fs_name')['optimization_time'].describe().round(3))
+
+    print('\nHow does the optimization time depend on the feature selectors in simultaneous search',
+          '(with k=5)?')
+    print(results[(results['search_name'] == 'simultaneous') & (results['k'] == 5)].groupby(
+        'fs_name')['optimization_time'].describe().round(3))
+
+    # Table 5 (arXiv version)
+    print('\nTable: Impact of search and feature selector on optimization time\n')
+    print_results = results[results['k'] == 5].groupby(['fs_name', 'search_name'])[
+        'optimization_time'].mean().reset_index()
+    print_results = print_results.pivot(index='fs_name', columns='search_name')
+    print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
+
+    print('\nHow does the mean optimization time develop over the number of alternatives for',
+          'different feature selectors in sequential search (with k=5)?')
+    print(results[(results['search_name'] == 'sequential') & (results['k'] == 5)].groupby(
+        ['fs_name', 'n_alternative'])['optimization_time'].mean().reset_index().pivot(
+            index='n_alternative', columns='fs_name').round(3))
+
+    print('\nHow does the mean optimization time develop over the number of alternatives for',
+          'different feature selectors in simultaneous search (with k=5)?')
+    print_results = results[(results['search_name'] == 'simultaneous') & (results['k'] == 5)]
+    print_results = print_results.groupby(['fs_name', 'num_alternatives'])[
+        'optimization_time'].mean().reset_index()
+    print_results = print_results.pivot(index='num_alternatives', columns='fs_name')
+    print(print_results.round(3))
+
+    # Table 6 (arXiv version)
+    print('\nTable: Impact of search and number of alternatives on sim-search optimization time\n')
+    print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
     print('\n-- Number of Alternatives --')
 
