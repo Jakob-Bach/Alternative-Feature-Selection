@@ -66,7 +66,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # beginning of each search for alternative feature sets.
     @staticmethod
     def create_solver() -> pywraplp.Solver:
-        solver = pywraplp.Solver.CreateSolver('CBC')  # see documentation for other solvers
+        solver = pywraplp.Solver.CreateSolver('SCIP')  # see documentation for available solvers
         solver.SetNumThreads(1)  # we already parallelize experimental pipeline
         return solver
 
