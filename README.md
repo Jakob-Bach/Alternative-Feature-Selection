@@ -1,18 +1,26 @@
-# Finding Optimal Solutions for Alternative Feature Selection
+# Alternative Feature Selection
 
-This repository contains the code of the paper
+This repository contains the code of two papers:
 
 > Bach, Jakob. "Finding Optimal Solutions for Alternative Feature Selection"
 
-(The paper is not published yet.
-Once it's published, we'll add a link to it here.
+(Currently under review at SDM 2023.
+Use the tag `run-2022-05-13` for reproducing results since the code has evolved a bit afterwards.
+In case the paper is accepted and published, we'll link it here.
+We'll link the experimental data, too.)
+
+> Bach, Jakob. "Finding Optimal Diverse Feature Sets via Alternative Feature Selection"
+
+(To be submitted at arXiv.
+Currently, there is no dedicated tag since the coding is in progress.
+Once the paper is published, we'll link it here.
 We'll link the experimental data, too.)
 
 This document describes the repo structure, a short demo, and the steps to reproduce the experiments.
 
-## Repo Structure
+## Repo Structure and Developer Info
 
-At the moment, the repository contains six Python files and four non-code files.
+Currently, the repository contains six Python files and four non-code files.
 The non-code files are:
 
 - `.gitignore`: For Python development.
@@ -36,34 +44,44 @@ only these two files might be relevant for you:
 
 - `afs.py`: Classes for alternative feature selection.
   `AlternativeFeatureSelector` is the abstract superclass.
-  It contains solver configuration, the dissimilarity-based definition of alternatives,
-  and the two search procedures, i.e., sequential as well as simultaneous.
-  To integrate a particular feature selector, you need to create a subclass.
-  The subclass needs to define the optimization problem of the feature selector
+  It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
+  two search procedures, i.e., sequential as well as simultaneous (sum-objective and min-objective).
+  To integrate a new feature-selection method, you need to create a subclass.
+  The subclass needs to define the optimization problem of the feature-selection method
   (the objective function and maybe constraints) in `initialize_solver()` and
   the process of solving the optimization problem in `select_and_evaluate()`.
   The search procedures for alternatives implemented in `AlternativeFeatureSelector` basically add
   further constraints (for alternatives) to the optimization problem and call the solving routine.
-  We did this subclassing for the four feature selectors in our experiments, i.e.,
-  mutual information (univariate filter), FCBF, model-based importance, and greedy wrapper.
+  We did this subclassing for the five feature-selection methods in our experiments, i.e.,
+  mutual information (univariate filter), FCBF, model-based importance, mRMR, and greedy wrapper.
+  There are further abstract superclasses extracting commonalities between feature selectors.
+  In particular, `WhiteBoxFeatureSelector` is a good starting point if you want to optimize your
+  objective with a solver (rather than only using the solver to check constraints while optimizing
+  a black-box objective separately).
+  `LinearQualityFeatureSelector` defines an objective that sums up the quality of individual
+  features, so your subclass only has to define how to compute these qualities.
 - `prediction.py`: Functions to make predictions for the experimental pipeline
-  and two of our feature selectors that use prediction models (model-based and wrapper).
+  and two of our feature-selection methods that use prediction models (model-based and wrapper).
 
 ## Demo
 
 Running alternative feature selection only requires three steps:
 
-1) Create the feature selector (our code contains four different ones).
+1) Create the feature selector (our code contains five different ones).
 2) Set the dataset:
-    - feature-part and prediction target separated, train-test split
-    - data types: `DataFrame` and `Series` from `pandas`
+    - Four parameters: feature part and prediction target are separated, train-test split
+    - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
 3) Run the search for alternatives:
-    - Method name determines whether sequential or simultaneous search is run.
+    - Method name (`search_sequentially()` / `search_simultaneously()`) determines whether
+      a sequential or a simultaneous search is run.
     - `k` determines the number of features to be selected.
     - `num_alternatives` determines ... you can guess what.
     - `tau_abs` determines by how many features the feature sets should differ.
       You can also provide a relative value (from the interval `[0,1]`) via `tau`,
       and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
+    - `objective_agg` switches between the min-objective and the sum-objective in a simultaneous
+      search. Has no effect in sequential search (which only returns one feature set, so there is no
+      need to aggregate feature-set quality over feature sets).
 
 ```python
 import afs
@@ -79,7 +97,9 @@ search_result = feature_selector.search_sequentially(k=3, num_alternatives=5, ta
 print(search_result.drop(columns='optimization_time').round(2))
 ```
 
-The search result is a `DataFrame`:
+The search result is a `DataFrame` containing the indices of the selected features (can be used to
+subset the columns in `X`), objective values on the training set and test set, optimization status,
+and optimization time:
 
 ```
   selected_idxs  train_objective  test_objective  optimization_status
@@ -91,13 +111,19 @@ The search result is a `DataFrame`:
 5            []              NaN             NaN                    2
 ```
 
-The search procedure ran out of feature here, as the `iris` dataset only has four features.
+The search procedure ran out of features here, as the `iris` dataset only has four features.
+The optimization statuses are:
+
+- 0: `Optimal` (optimal solution found)
+- 1: `Feasible` (a valid solution found till timeout, but may not be optimal)
+- 2: `Infeasible` (there is no valid solution)
+- 6: `Not solved` (no valid solution found till timeout, but there may be one)
 
 ## Setup
 
 Before running the scripts to reproduce the experiments, you should
 
-1) Set up an environment (optional, but recommended).
+1) Set up an environment (optional but recommended).
 2) Install all necessary dependencies.
 
 Our code is implemented in Python (version 3.8; other versions, including lower ones, might work as well).
@@ -183,17 +209,23 @@ python -m prepare_datasets
 ```
 
 to download and pre-process the input data for the experiments (prediction datasets from PMLB).
+
 Next, start the experimental pipeline with
 
 ```bash
 python -m run_experiments
 ```
 
-Depending on your hardware, this might take several hours or even days
-(we had a runtime of several hours on a server with 32 CPU cores).
-In case the pipeline is nearly finished, but doesn't make progress any more,
-the solver might have silently crashed.
-You can re-run the pipeline, in which case it detects existing results and focuses on missing ones.
+Depending on your hardware, this might take several days.
+We had a runtime of 141 hours on a server with an `AMD EPYC 7551` [CPU](https://www.amd.com/en/products/cpu/amd-epyc-7551)
+(32 physical cores, base clock of 2.0 GHz).
+In case the pipeline is nearly finished but doesn't make progress anymore,
+the solver might have silently crashed (which happened in the past with `Cbc` as the solver, though
+we didn't encounter the phenomenon with the current solver `SCIP`).
+In this case, or if you had to abort the experimental run for other reasons, you could re-start the
+experimental pipeline by calling the same script again; it automatically detects existing results
+and only runs the remaining tasks.
+
 To print statistics and create the plots for the paper, run
 
 ```bash
