@@ -632,6 +632,7 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                     j = j + 1
                 for s_j in swap_variables:
                     s_j.SetBounds(0, 1)  # revert fixing to one value (make regular binary again)
+                swap_variables.clear()  # next iteration will swap at different position
             selected_idxs = [[j for (j, s_j_value) in enumerate(s_value) if s_j_value]
                              for s_value in s_value_list]
             result = pd.DataFrame({
