@@ -45,9 +45,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             (results['selected_idxs'].apply(len) == results['k'])).all()
     # Rename some values:
     results['fs_name'] = results['fs_name'].str.removesuffix('Selector').replace(
-        {'GreedyWrapper': 'Greedy Wrapper', 'ModelImportance': 'Model Gain'})
-    fs_name_plot_order = ['MI', 'FCBF', 'Greedy Wrapper', 'Model Gain']
-    results['search_name'] = results['search_name'].str.replace('(search_|ly)', '', regex=True)
+        {'GreedyWrapper': 'Greedy Wrapper', 'ModelImportance': 'Model Gain', 'MRMR': 'mRMR'})
+    fs_name_plot_order = ['MI', 'FCBF', 'mRMR', 'Model Gain', 'Greedy Wrapper']
+    results['search_name'] = results['search_name'].replace({'search_sequentially': 'seq.',
+                                                             'search_simultaneously': 'sim.'})
+    results.loc[results['search_name'] == 'sim.', 'search_name'] = (
+        'sim. (' + results.loc[results['search_name'] == 'sim.', 'objective_agg'] + ')')
+    results.drop(columns='objective_agg', inplace=True)
+    search_name_plot_order = ['sim. (min)', 'sim. (sum)', 'seq.']
     results['optimization_status'].replace({0: 'Optimal', 1: 'Feasible', 2: 'Infeasible',
                                             6: 'Not solved'}, inplace=True)
     # Define columns for main experimental dimensions (corresponding to independent search runs):
@@ -94,14 +99,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(results.groupby('dataset_name')[['train_objective', 'decision_tree_test_mcc']].median(
         ).describe().round(2))
 
-    print('\nHow does feature set-quality (all experim. settings)  (Spearman-)correlate with "n"?')
+    print('\nHow does feature set-quality (all experim. settings) (Spearman-)correlate with "n"?')
     print(results[quality_metrics].corrwith(results['n'], method='spearman').round(2))
 
     print('\nHow does feature set-quality (all experim. settings) (Spearman-)correlate with "k/n"?')
     print(results[quality_metrics].corrwith(results['k'] / results['n'], method='spearman').round(2))
 
     # Figure 1 (arXiv version): Impact of feature-set size "k" and dataset size "n"
-    plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
+    plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
                            (results['n_alternative'] == 0) & (results['fs_name'] == 'MI')].copy()
     plot_results['k/n'] = plot_results['k'] / plot_results['n']
     plot_metrics = ['train_objective', 'decision_tree_test_mcc']
@@ -145,8 +150,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 palette='Set2', fliersize=1, hue_order=fs_name_plot_order)
     plt.ylim(-0.55, 1.35)
     plt.yticks(np.arange(start=-0.4, stop=1.3, step=0.2))
-    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
-                     bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
+    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'evaluation-metrics-overfitting.pdf')
 
@@ -168,7 +174,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n------ Feature-Selection Methods ------')
 
-    plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
+    plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
                            (results['n_alternative'] == 0)]
 
     print('\n-- Prediction performance --')
@@ -187,28 +193,30 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.xlabel('Feature-set size $k$')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
-    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
-                     bbox_to_anchor=(-0.3, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.25, -0.1),
+               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
+    plt.figtext(x=0.07, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-fs-method-k-decision-tree-test-mcc.pdf')
 
-    print('\nHow many iterations did wrapper search perform?')
+    print('\nHow many iterations did wrapper search perform for the original feature sets of',
+          'sequential search?')
+    print(plot_results['wrapper_iters'].describe().round(2))
+
+    print('\nHow many iterations did wrapper search perform over all experimental settings?')
     print(results['wrapper_iters'].describe().round(2))
 
     print('\nHow many iterations did sequential wrapper search perform?')
-    print(results[results['search_name'] == 'sequential'].groupby('n_alternative')[
+    print(results[results['search_name'] == 'seq.'].groupby('n_alternative')[
         'wrapper_iters'].describe().round(2))
 
-    print('\nHow many iterations did sequential wrapper search perform?')
-    print(results[results['search_name'] == 'simultaneous'].groupby('num_alternatives')[
+    print('\nHow many iterations did simultaneous wrapper (sum-objective) search perform?')
+    print(results[results['search_name'] == 'sim. (sum)'].groupby('num_alternatives')[
         'wrapper_iters'].describe().round(2))
 
     print('\nHow does the optimization status differ between feature-selection methods?')
     print(pd.crosstab(results['optimization_status'], results['fs_name'],
                       normalize='columns').applymap('{:.2%}'.format))
-
-    plot_results = results[(results['search_name'] == 'sequential') & (results['tau_abs'] == 1) &
-                           (results['n_alternative'] == 0)]
 
     print('\nHow does the optimization status differ between feature-selection methods for the',
           'original feature sets of sequential search?')
@@ -236,8 +244,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.65, 0.65)
     plt.yticks(np.arange(start=-0.6, stop=0.7, step=0.2))
-    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
-                     bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
+    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-fs-method-k-metric-diff.pdf')
 
@@ -249,12 +258,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n---- Search Method ----')
 
-    comparison_results = results[(results['search_name'] == 'simultaneous') & (results['k'] == 5)]
-    for num_alternatives in results.loc[results['search_name'] == 'simultaneous',
+    comparison_results = results[(results['search_name'].str.startswith('sim')) &
+                                 (results['k'] == 5)]
+    for num_alternatives in results.loc[results['search_name'].str.startswith('sim'),
                                         'num_alternatives'].unique():
         # Extract first "num_alternatives + 1" feature sets (sequential search is only run for one
         # value of "num_alternatives", but you can get "smaller" results by subsetting)
-        seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 5) &
+        seq_results = results[(results['search_name'] == 'seq.') & (results['k'] == 5) &
                               (results['n_alternative'] <= num_alternatives)].copy()
         seq_results['num_alternatives'] = num_alternatives
         comparison_results = pd.concat([comparison_results, seq_results])
@@ -265,19 +275,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
         plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
         plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
-        plot_results['search_name'] = plot_results['search_name'].str.replace(
-            '(uential|ultaneous)', '.', regex=True)
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=1)
+                    palette='Set2', fliersize=1, hue_order=search_name_plot_order)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
         plt.ylim(-0.05, 0.35)
-        leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
-                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
-        leg.get_title().set_position((-117, -21))
+        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+                   columnspacing=1, framealpha=0, ncols=2)
+        plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
@@ -296,19 +304,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             [(-0.05, 1.05), (-0.05, 0.65), (-0.3, 1.05)], [0, 0, -0.2]):
         plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
         plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
-        plot_results['search_name'] = plot_results['search_name'].str.replace(
-            '(uential|ultaneous)', '.', regex=True)
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=1)
+                    palette='Set2', fliersize=1, hue_order=search_name_plot_order)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
         plt.ylim(ylim)
         plt.yticks(np.arange(start=min_tick, stop=ylim[1], step=0.2))
-        leg = plt.legend(title='Search', edgecolor='white', loc='upper left',
-                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
-        leg.get_title().set_position((-117, -21))
+        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+                   columnspacing=1, framealpha=0, ncols=2)
+        plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-search-mean-{metric.replace("_", "-")}.pdf')
 
@@ -327,19 +333,22 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     sns.boxplot(x='search_name', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
                 palette='Set2', fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Search')
+    plt.xticks(rotation=10, horizontalalignment='right')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
-    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
-                     bbox_to_anchor=(-0.3, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.15),
+               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
+    plt.figtext(x=0.07, y=0.14, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-fs-method-decision-tree-test-mcc.pdf')
 
     print('\nWhat is the median of the average feature-set quality difference "simultaneous search',
-          'minus sequential search" (with k=5; each comparison for the same search setting)?')
+          '(sum-objective) minus sequential search" (with k=5; each comparison for the same search',
+          'setting)?')
     plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index(
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
                 values='train_objective').reset_index()
-    plot_results['sim - seq'] = plot_results['simultaneous'] - plot_results['sequential']
+    plot_results['sim - seq'] = plot_results['sim. (sum)'] - plot_results['seq.']
     print(plot_results.groupby(['fs_name', 'num_alternatives'])['sim - seq'].median().round(3))
 
     # Figure 5b: Distribution of difference of metrics between search methods
@@ -348,9 +357,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
                 values=plot_metrics).reset_index()
     for metric in plot_metrics:
-        plot_results[(metric, 'diff')] = (plot_results[(metric, 'simultaneous')] -
-                                          plot_results[(metric, 'sequential')])
-        plot_results.drop(columns=[(metric, 'sequential'), (metric, 'simultaneous')], inplace=True)
+        plot_results[(metric, 'diff')] = (plot_results[(metric, 'sim. (sum)')] -
+                                          plot_results[(metric, 'seq.')])
+    plot_results = plot_results.loc[:, (slice(None), ['', 'diff'])]  # keep "diff" & non-search cols
     plot_results = plot_results.droplevel(level='search_name', axis='columns')
     plot_results = plot_results.melt(id_vars='fs_name', value_vars=plot_metrics, var_name='Metric',
                                      value_name='Difference')
@@ -359,11 +368,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
                 fliersize=1, hue_order=fs_name_plot_order)
-    plt.ylabel('Difference sim. vs. seq.', y=0.45)  # moved a bit downwards to fit on plot
-    plt.ylim(-0.45, 0.35)
-    plt.yticks(np.arange(start=-0.4, stop=0.4, step=0.1))
-    leg = plt.legend(title='Feature selector', edgecolor='white', loc='upper left', ncols=2,
-                     bbox_to_anchor=(-0.25, -0.2), alignment='left', columnspacing=1, framealpha=0)
+    plt.ylabel('Difference sim. vs. seq.')
+    plt.ylim(-0.35, 0.35)
+    plt.yticks(np.arange(start=-0.3, stop=0.4, step=0.1))
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
+    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'impact-search-fs-method-metric-diff.pdf')
 
@@ -375,14 +385,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # While sequential search has one optimization status per feature set (as they are found
     # separately), simultaneous search has same status for multiple feature sets; to not bias
     # analysis towards higher humber of alternatives, we only extract one status per sim. search
-    assert ((comparison_results.loc[comparison_results['search_name'] == 'simultaneous'].groupby(
-        group_cols)['optimization_status'].nunique() == 1).all())
+    assert ((comparison_results.loc[comparison_results['search_name'].str.startswith(
+        'sim')].groupby(group_cols)['optimization_status'].nunique() == 1).all())
     plot_results = pd.concat([
         comparison_results.loc[
-            comparison_results['search_name'] == 'sequential',
+            comparison_results['search_name'] == 'seq.',
             ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
         ],
-        comparison_results[comparison_results['search_name'] == 'simultaneous'].groupby(
+        comparison_results[comparison_results['search_name'].str.startswith('sim')].groupby(
             group_cols).first().reset_index()[
                 ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
         ]
@@ -403,16 +413,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         axis='index').to_latex(hrules=True))
 
     print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
-          'search (with k=5 and excluding greedy FS)?')
-    print(pd.crosstab(plot_results.loc[plot_results['search_name'] == 'simultaneous',
+          'search (with sum-objective, k=5 and excluding greedy FS)?')
+    print(pd.crosstab(plot_results.loc[plot_results['search_name'] == 'sim. (sum)',
                                        'optimization_status'],
-                      plot_results.loc[plot_results['search_name'] == 'simultaneous',
+                      plot_results.loc[plot_results['search_name'] == 'sim. (sum)',
                                        'num_alternatives'],
                       normalize='columns').applymap('{:.2%}'.format))
 
     # Table 4 (arXiv version)
-    print('\nTable: Impact of number of alternatives on sim-search optimization status\n')
-    print_results = plot_results[plot_results['search_name'] == 'simultaneous']
+    print('\nTable: Impact of number of alternatives on simultaneous search (sum-objective)',
+          'optimization status\n')
+    print_results = plot_results[plot_results['search_name'] == 'sim. (sum)']
     print_results = (print_results.groupby('num_alternatives')['optimization_status'].value_counts(
         normalize=True) * 100).rename('Frequency').reset_index()
     print_results = print_results.pivot(index='num_alternatives', values='Frequency',
@@ -425,13 +436,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nHow does the optimization time depend on the feature selectors in sequential search',
           '(with k=5)?')
-    print(results[(results['search_name'] == 'sequential') & (results['k'] == 5)].groupby(
+    print(results[(results['search_name'] == 'seq.') & (results['k'] == 5)].groupby(
         'fs_name')['optimization_time'].describe().round(3))
 
     print('\nHow does the optimization time depend on the feature selectors in simultaneous search',
-          '(with k=5)?')
-    print(results[(results['search_name'] == 'simultaneous') & (results['k'] == 5)].groupby(
-        'fs_name')['optimization_time'].describe().round(3))
+          '(with sum-objective and k=5)?')
+    print(results[(results['search_name'] == 'sim. (sum)') & (results['k'] == 5)].groupby(
+        'fs_name')['optimization_time'].describe().round(2))
 
     # Table 5 (arXiv version)
     print('\nTable: Impact of search and feature selector on optimization time\n')
@@ -442,13 +453,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nHow does the mean optimization time develop over the number of alternatives for',
           'different feature selectors in sequential search (with k=5)?')
-    print(results[(results['search_name'] == 'sequential') & (results['k'] == 5)].groupby(
+    print(results[(results['search_name'] == 'seq.') & (results['k'] == 5)].groupby(
         ['fs_name', 'n_alternative'])['optimization_time'].mean().reset_index().pivot(
             index='n_alternative', columns='fs_name').round(3))
 
     print('\nHow does the mean optimization time develop over the number of alternatives for',
-          'different feature selectors in simultaneous search (with k=5)?')
-    print_results = results[(results['search_name'] == 'simultaneous') & (results['k'] == 5)]
+          'different feature selectors in simultaneous search (with sum-objective and k=5)?')
+    print_results = results[(results['search_name'] == 'sim. (sum)') & (results['k'] == 5)]
     print_results = print_results.groupby(['fs_name', 'num_alternatives'])[
         'optimization_time'].mean().reset_index()
     print_results = print_results.pivot(index='num_alternatives', columns='fs_name')
@@ -462,16 +473,24 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Feature-set quality --')
 
-    seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 5)]
+    seq_results = results[(results['search_name'] == 'seq.') & (results['k'] == 5)].copy()
     normalization_funcs = {'max': lambda x: x / x.max(),
                            'min-max': lambda x: (x - x.min()) / (x.max() - x.min())}
     plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+
+    # Shift [-1, 1] metrics to [0, 1] first, since (1) max-normalizing with a negative max changes
+    # order, e.g., [-0.5, -0.6, ..., -1] becomes [1, 1.2, ..., 2] (lower numbers get higher) and
+    # (2) filling NAs with 0 makes most sense if 0 is the theoretical minimum of the metric
+    condition = seq_results['fs_name'].isin(('mRMR', 'Greedy Wrapper'))
+    seq_results.loc[condition, ['train_objective', 'test_objective']] = (
+        seq_results.loc[condition, ['train_objective', 'test_objective']] + 1) / 2
+    seq_results['decision_tree_test_mcc'] = (seq_results['decision_tree_test_mcc'] + 1) / 2
 
     for (func_name, normalization_func), fillna in itertools.product(
             normalization_funcs.items(), (False, True)):
         norm_results = seq_results[group_cols + plot_metrics + ['n_alternative']].copy()
         normalization_name = func_name
-        if fillna:  # not all metrics have 0 as theoretical minimum, but it suffices for analysis
+        if fillna:  # after shifting performed above, all metrics have 0 as theoretical minimum
             norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
             normalization_name += '-fillna'
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
@@ -484,38 +503,46 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             print(norm_results.groupby(['n_alternative', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='n_alternative', columns='fs_name').round(2))
 
-        # Figures 6a-6d (arXiv version): Impact of number of alternatives on objective value
+        # Figures 6a-6d (arXiv version): Impact of number of alternatives on feature-set quality
         plot_results = norm_results[(norm_results['fs_name'] == 'MI')].melt(
-            id_vars=['n_alternative'], value_vars=['train_objective', 'test_objective'],
-            var_name='split', value_name='objective')
-        plot_results['split'] = plot_results['split'].str.replace('_objective', '')
-        plt.figure(figsize=(4, 3))
+            id_vars='n_alternative', value_vars=plot_metrics, var_name='Metric',
+            value_name='quality')
+        plot_results['Metric'].replace(metric_name_mapping, inplace=True)
+        plt.figure(figsize=(8, 3))
         plt.rcParams['font.size'] = 15
-        sns.boxplot(x='n_alternative', y='objective', hue='split', data=plot_results,
+        sns.boxplot(x='n_alternative', y='quality', hue='Metric', data=plot_results,
                     palette='Set2', fliersize=1)
         plt.xlabel('Number of alternative')
         plt.ylabel('Normalized $Q$')
         plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-        leg = plt.legend(title='Split', edgecolor='white', loc='upper left',
-                         bbox_to_anchor=(0, -0.1), columnspacing=1, framealpha=0, ncols=2)
-        leg.get_title().set_position((-107, -21))
+        leg = plt.legend(title='Metric', edgecolor='white', loc='upper center', columnspacing=1,
+                         ncols=3, bbox_to_anchor=(0.5, -0.1), handletextpad=0.2, framealpha=0)
+        leg.get_title().set_position((-170, -24))
         plt.tight_layout()
-        plt.savefig(plot_dir / f'impact-num-alternatives-objective-{normalization_name}.pdf')
+        plt.savefig(plot_dir / f'impact-num-alternatives-quality-{normalization_name}.pdf')
 
-        if func_name == 'min-max':  # with pure max normalization, large negative values can occur
-            # Figures 6e, 6f (arXiv version): Impact of number of alternatives on test MCC
-            metric = 'decision_tree_test_mcc'
-            plot_results = norm_results[norm_results['fs_name'] == 'MI']
-            plt.figure(figsize=(4, 3))
-            plt.rcParams['font.size'] = 15
-            sns.boxplot(x='n_alternative', y=metric, data=plot_results,
-                        color=sns.color_palette('Set2').as_hex()[1], fliersize=1)
-            plt.xlabel('Number of alternative')
-            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-            plt.tight_layout()
-            plt.savefig(plot_dir / (f'impact-num-alternatives-{metric.replace("_", "-")}-' +
-                                    f'{normalization_name}.pdf'))
+        if (func_name == 'max') and (not fillna):
+            for metric in ['train_objective', 'decision_tree_test_mcc']:
+                # Figures 7a, 7b (arXiv version): Impact of number of alternatives and feature
+                # selector on feature-set quality
+                plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].median(
+                    ).reset_index()
+                plt.figure(figsize=(5, 5))
+                plt.rcParams['font.size'] = 18
+                sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
+                             data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                             style_order=fs_name_plot_order)
+                plt.xlabel('Number of alternative')
+                plt.xticks(range(11))
+                plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+                plt.ylim(0.78, 1.02)
+                plt.yticks(np.arange(start=0.8, stop=1.05, step=0.05))
+                plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
+                           bbox_to_anchor=(-0.2, -0.1), framealpha=0, handletextpad=0.2)
+                plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+                plt.tight_layout()
+                plt.savefig(plot_dir /
+                            f'impact-num-alternatives-fs-method-{metric.replace("_", "-")}-max.pdf')
 
     print('\n-- Optimization status --')
 
@@ -523,9 +550,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         print('\nHow does the optimization status differ between the number of alternatives in',
               f'sequential search (with k={k}) for MI feature selection?')
         print(pd.crosstab(
-            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'sequential') &
+            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'seq.') &
                         (results['k'] == k), 'n_alternative'],
-            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'sequential') &
+            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'seq.') &
                         (results['k'] == k), 'optimization_status'],
             normalize='index').applymap('{:.2%}'.format))
 
@@ -534,17 +561,20 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Feature-set quality --')
 
     # Here, we use k=10 instead of k=5 to have more distinct values of "tau" (10 instead of 5)
-    seq_results = results[(results['search_name'] == 'sequential') & (results['k'] == 10)]
+    seq_results = results[(results['search_name'] == 'seq.') & (results['k'] == 10)].copy()
+    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+
+    # See above (analyzing num alternatives) for reasons for shifting values of metrics
+    condition = seq_results['fs_name'].isin(('mRMR', 'Greedy Wrapper'))
+    seq_results.loc[condition, ['train_objective', 'test_objective']] = (
+        seq_results.loc[condition, ['train_objective', 'test_objective']] + 1) / 2
+    seq_results.loc['decision_tree_test_mcc'] = (seq_results['decision_tree_test_mcc'] + 1) / 2
 
     for (func_name, normalization_func), fillna in itertools.product(
             normalization_funcs.items(), (False, True)):
-        if func_name == 'max':
-            plot_metrics = ['train_objective', 'test_objective']
-        else:
-            plot_metrics = ['decision_tree_test_mcc']
         norm_results = seq_results[group_cols + plot_metrics + ['n_alternative']].copy()
         normalization_name = func_name
-        if fillna:  # not all metrics have 0 as theoretical minimum, but it suffices for analysis
+        if fillna:  # after shifting performed above, all metrics have 0 as theoretical minimum
             norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
             normalization_name += '-fillna'
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
@@ -565,8 +595,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             print(norm_results.groupby(['tau_abs', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='tau_abs', columns='fs_name').round(2))
 
-        for metric in plot_metrics:
-            # Figures 7a-7f (arXiv version): Impact of number of alternatives and "tau" on
+        for metric in (['train_objective', 'test_objective'] if func_name == 'max'
+                       else ['decision_tree_test_mcc']):
+            # Figures 8a-8f (arXiv version): Impact of number of alternatives and "tau" on
             # feature-set quality
             plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
                 ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
@@ -591,18 +622,42 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.savefig(plot_dir / (f'impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
                                     f'{normalization_name}.pdf'))
 
+        if (func_name == 'max') and (not fillna):
+            for metric in ['train_objective', 'decision_tree_test_mcc']:
+                # Figures 10a, 10b (arXiv version): Impact of number of alternatives and feature
+                # selector on feature-set quality
+                plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].median(
+                    ).reset_index()
+                plot_results['tau'] = plot_results['tau_abs'] / 10
+                plt.figure(figsize=(5, 5))
+                plt.rcParams['font.size'] = 18
+                sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
+                             data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                             style_order=fs_name_plot_order)
+                plt.xlabel('$\\tau$')
+                plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
+                plt.xticks(np.arange(start=0.2, stop=1.1, step=0.1), minor=True)
+                plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+                plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+                plt.ylim(-0.05, 1.05)
+                plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
+                           bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
+                plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+                plt.tight_layout()
+                plt.savefig(plot_dir / f'impact-tau-fs-method-{metric.replace("_", "-")}-max.pdf')
+
     print('\n-- Optimization status --')
 
     for k in results['k'].unique():
         plot_results = results[(results['fs_name'] == 'MI') & (results['k'] == k) &
-                               (results['search_name'] == 'sequential')]
+                               (results['search_name'] == 'seq.')]
 
         print('\nHow does the optimization status differ between the dissimilarity thresholds in',
               f'sequential search (with k={k}) for MI feature selection?')
         print(pd.crosstab(plot_results['tau_abs'], plot_results['optimization_status'],
                           normalize='index').applymap('{:.2%}'.format))
 
-        # Figures 8a, 8b (arXiv version): Impact of number of alternatives and "tau" on
+        # Figures 9a, 9b (arXiv version): Impact of number of alternatives and "tau" on
         # optimization status
         assert plot_results['optimization_status'].isin(['Infeasible', 'Optimal']).all()
         plot_results = plot_results.groupby(['tau_abs', 'n_alternative'])[
@@ -625,6 +680,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.ylim(-0.05, 1.05)
         plt.tight_layout()
         plt.savefig(plot_dir / f'impact-num-alternatives-tau-optimization-status-k-{k}.pdf')
+
+    print('\n------ Composition of Feature Sets (not used in paper) ------')
 
     print('\nHow many new features occur in a feature set from one alternative to next in',
           'sequential search (k=10) for MI as feature selector?')
