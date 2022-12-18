@@ -123,7 +123,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                          bbox_to_anchor=(0.3, -0.1),  columnspacing=1, handletextpad=0, framealpha=0)
         leg.get_title().set_position((-124, -22))
         plt.tight_layout()
-        plt.savefig(plot_dir / f'impact-dataset-k-{metric.replace("_", "-")}.pdf')
+        plt.savefig(plot_dir / f'afs-impact-dataset-k-{metric.replace("_", "-")}.pdf')
 
     print('\n------ Feature-Set Quality Metrics ------')
 
@@ -153,7 +153,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
     plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
-    plt.savefig(plot_dir / 'evaluation-metrics-overfitting.pdf')
+    plt.savefig(plot_dir / 'afs-evaluation-metrics-overfitting.pdf')
 
     print('\n-- Correlation between evaluation metrics --')
 
@@ -164,7 +164,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.rcParams['font.size'] = 16
     sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'evaluation-metrics-correlation.pdf')
+    plt.savefig(plot_dir / 'afs-evaluation-metrics-correlation.pdf')
 
     print('\n------ Feature-Selection Methods ------')
 
@@ -189,7 +189,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
     plt.figtext(x=0.07, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
-    plt.savefig(plot_dir / 'impact-fs-method-k-decision-tree-test-mcc.pdf')
+    plt.savefig(plot_dir / 'afs-impact-fs-method-k-decision-tree-test-mcc.pdf')
 
     print('\nHow many iterations did wrapper search perform for the original feature sets of',
           'sequential search?')
@@ -232,7 +232,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
     plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
-    plt.savefig(plot_dir / 'impact-fs-method-k-metric-diff.pdf')
+    plt.savefig(plot_dir / 'afs-impact-fs-method-k-metric-diff.pdf')
 
     print('\nHow do the evaluation metrics differ between k=10 and k=5 on median for the original',
           'feature sets of sequential search?')
@@ -279,7 +279,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                    columnspacing=1, framealpha=0, ncols=2)
         plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
-        plt.savefig(plot_dir / f'impact-search-stddev-{metric.replace("_", "-")}.pdf')
+        plt.savefig(plot_dir / f'afs-impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
     print('\n-- Average value of feature-set quality --')
 
@@ -307,7 +307,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                    columnspacing=1, framealpha=0, ncols=2)
         plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
-        plt.savefig(plot_dir / f'impact-search-mean-{metric.replace("_", "-")}.pdf')
+        plt.savefig(plot_dir / f'afs-impact-search-mean-{metric.replace("_", "-")}.pdf')
 
     # Figure 5a (arXiv version): Impact of search method and feature selector on test MCC
     plot_results = comparison_results[group_cols + ['decision_tree_test_mcc']].copy()
@@ -324,7 +324,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
     plt.figtext(x=0.07, y=0.14, s='Selection', rotation='vertical')
     plt.tight_layout()
-    plt.savefig(plot_dir / 'impact-search-fs-method-decision-tree-test-mcc.pdf')
+    plt.savefig(plot_dir / 'afs-impact-search-fs-method-decision-tree-test-mcc.pdf')
 
     print('\nWhat is the median of the average feature-set quality difference "simultaneous search',
           '(sum-objective) minus sequential search" (with k=5 and 1-5 alternatives; each',
@@ -358,7 +358,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
     plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
     plt.tight_layout()
-    plt.savefig(plot_dir / 'impact-search-fs-method-metric-diff.pdf')
+    plt.savefig(plot_dir / 'afs-impact-search-fs-method-metric-diff.pdf')
 
     print('\n-- Optimization status --')
 
@@ -519,7 +519,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                          ncols=3, bbox_to_anchor=(0.5, -0.1), handletextpad=0.2, framealpha=0)
         leg.get_title().set_position((-170, -24))
         plt.tight_layout()
-        plt.savefig(plot_dir / f'impact-num-alternatives-quality-{normalization_name}.pdf')
+        plt.savefig(plot_dir / f'afs-impact-num-alternatives-quality-{normalization_name}.pdf')
 
         if (func_name == 'max') and (not fillna):
             for metric in ['train_objective', 'decision_tree_test_mcc']:
@@ -541,8 +541,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                            bbox_to_anchor=(-0.2, -0.1), framealpha=0, handletextpad=0.2)
                 plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
                 plt.tight_layout()
-                plt.savefig(plot_dir /
-                            f'impact-num-alternatives-fs-method-{metric.replace("_", "-")}-max.pdf')
+                plt.savefig(plot_dir / ('afs-impact-num-alternatives-fs-method-' +
+                                        f'{metric.replace("_", "-")}-max.pdf'))
 
     print('\n-- Optimization status --')
 
@@ -611,7 +611,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
             plt.ylim(-0.05, 1.05)
             plt.tight_layout()
-            plt.savefig(plot_dir / (f'impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
+            plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
                                     f'{normalization_name}.pdf'))
 
         if (func_name == 'max') and (not fillna):
@@ -636,7 +636,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                            bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
                 plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
                 plt.tight_layout()
-                plt.savefig(plot_dir / f'impact-tau-fs-method-{metric.replace("_", "-")}-max.pdf')
+                plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
+                                        'max.pdf'))
 
     print('\n-- Optimization status --')
 
@@ -671,7 +672,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.gca().yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
         plt.ylim(-0.05, 1.05)
         plt.tight_layout()
-        plt.savefig(plot_dir / f'impact-num-alternatives-tau-optimization-status-k-{k}.pdf')
+        plt.savefig(plot_dir / f'afs-impact-num-alternatives-tau-optimization-status-k-{k}.pdf')
 
     print('\n------ Composition of Feature Sets (not used in paper) ------')
 
