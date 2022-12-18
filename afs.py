@@ -27,8 +27,8 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     (simultaneous, sequential) and various helper functions to formulate constraints. Class is
     abstract because an actual feature-selection method (used as subroutine in the search for
     alternatives) is not implemented here. Subclasses should at least override:
-    1) "initialize_solver()" (add feature-selection-specific objective and constraints)
-    2) "select_and_evaluate()" (use the solver to find feature sets)
+    1) "initialize_solver()" (add feature-selection-method-specific objective and constraints)
+    2) "select_and_evaluate()" (find feature sets under the constraints stored in a solver)
     Optionally, you can override "set_data()" to do dataset-specific pre-computations (once per
     dataset instead of once for each solver initialization).
     """
@@ -80,7 +80,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "k": The number of features to be selected.
     # - "objective_agg": How to aggregate the feature sets' qualities in the objective (if there are
     #   multiple feature sets optimized at once, i.e., in simultaneous search). Not used here, but
-    # should be considered when defining the objective in subclasses.
+    # should be handled appropriately when defining the objective in subclasses.
     def initialize_solver(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]],
                           k: int, objective_agg: str = 'sum') -> None:
@@ -145,14 +145,10 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
     # - "tau_abs": absolute number of differing features (only works for "dice")
     # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
-    # - "objective_agg": How to aggregate the feature sets' qualities in the objective. Parameter
-    #   only exists for consistency to simultaneous search but is irrelevant here (as we only find
-    #   one feature set per iteration, we do not need to aggregate over feature sets).
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
     def search_sequentially(self, k: int, num_alternatives: int, tau: Optional[float] = None,
-                            tau_abs: Optional[int] = None, d_name: str = 'dice',
-                            objective_agg: str = 'sum') -> pd.DataFrame:
+                            tau_abs: Optional[int] = None, d_name: str = 'dice') -> pd.DataFrame:
         results = []
         solver = AlternativeFeatureSelector.create_solver()
         s = [solver.BoolVar(name=f's_{j}') for j in range(self._n)]
@@ -196,7 +192,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
 class WhiteBoxFeatureSelector(AlternativeFeatureSelector, metaclass=ABCMeta):
     """Feature Selection as White-Box Problem
 
-    (Abstract) white-box feature selector. Subclasses need to define the function for creating the
+    (Abstract) white-box feature selector. Subclasses need to define the method for creating the
     (train and test) objectives.
     """
 
@@ -206,8 +202,8 @@ class WhiteBoxFeatureSelector(AlternativeFeatureSelector, metaclass=ABCMeta):
         self._Q_train_list = None  # Sequence[pywraplp.LinearExpr]; objectives for the feature sets
         self._Q_test_list = None  # Sequence[pywraplp.LinearExpr]; for evaluation, not optimization
 
-    # Should return expressions for train objective and test objectives (one per desired feature
-    # set, i.e., element from "s_list"), using variables from "s_list", data stored internally, and
+    # Should return expressions for train objective and test objective (one per desired feature
+    # set, i.e., element from "s_list"), using variables from "s_list", data stored in "self", and
     # potentially the number of features "k". Might add auxiliary variables and constraints to the
     # "solver".
     @abstractmethod
@@ -230,9 +226,7 @@ class WhiteBoxFeatureSelector(AlternativeFeatureSelector, metaclass=ABCMeta):
         elif objective_agg == 'min':
             Q_min = solver.NumVar(name='Q_min', lb=float('-inf'), ub=float('inf'))
             for i in range(len(s_list)):
-                Q_i = solver.NumVar(name=f'Q_{i}', lb=float('-inf'), ub=float('inf'))
-                solver.Add(Q_i == self._Q_train_list[i])
-                solver.Add(Q_min <= Q_i)
+                solver.Add(Q_min <= self._Q_train_list[i])
             objective = Q_min
         else:
             raise ValueError('Unknown objective aggregation.')
@@ -303,8 +297,8 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                 [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_test, s)]) for s in s_list])
 
     # Greedy-replacement search for alternative feature sets. Optimal for univariate feature
-    # qualities (objective: sum of them) as long a there are unused features. Works without solver.
-    # Tailored to the Dice dissimilarity.
+    # qualities (objective: sum of qualities over features and feature sets) as long a there are
+    # unused features. Works without a solver. Tailored to the Dice dissimilarity.
     # - "k": number of features to select
     # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
@@ -315,38 +309,38 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                                   tau_abs: Optional[int] = None) -> pd.DataFrame:
         if tau is not None:
             tau_abs = math.ceil(tau * k)
-        if k > self._n:
+        if k > self._n:  # not enough features for selection
             return pd.DataFrame()
         results = []
-        indices = np.argsort(self._q_train)[::-1]  # descending order
-        s = [0] * self._n
-        position = 0
+        indices = np.argsort(self._q_train)[::-1]  # descending order by qualities
+        s = [0] * self._n  # initial selection for all alternatives
+        position = 0  # index of index of currently selected feature
         while position < k - tau_abs:
             j = indices[position]
             s[j] = 1
             position = position + 1
-        i = 0
+        i = 0  # number of current alternative
         while i <= num_alternatives and i <= ((self._n - k) / tau_abs):
-            s_i = s.copy()
-            for _ in range(tau_abs):
+            s_i = s.copy()  # select best "k - tau_abs" features
+            for _ in range(tau_abs):  # select remaining "tau_abs" features
                 j = indices[position]
                 s_i[j] = 1
                 position = position + 1
             results.append(s_i)
             i = i + 1
-        # Transform into a result structure consistent to the other searches:
+        # Transform into a result structure consistent to the other searches in the top-level class:
         results = [{
             'selected_idxs': [j for (j, s_j) in enumerate(s) if s_j],
             'train_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_train, s)),
             'test_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s)),
             'optimization_status': pywraplp.Solver.OPTIMAL
         } for s in results]
-        for i in range(i, num_alternatives + 1):  # in case algoritithm ran out of features early
+        for i in range(i, num_alternatives + 1):  # in case algorithm ran out of features early
             results.append({
                 'selected_idxs': [],
                 'train_objective': float('nan'),
                 'test_objective': float('nan'),
-                'optimization_status': pywraplp.Solver.NOT_SOLVED
+                'optimization_status': pywraplp.Solver.NOT_SOLVED  # not necessarily infeasible
             })
         results = pd.DataFrame(results)
         results['optimization_time'] = float('nan')  # not worth to measure it
@@ -381,7 +375,8 @@ class FCBFSelector(MISelector):
     Multivariate filter feature selector that uses mutual information between features and target as
     objective. Additionally, there are constraints on the mutual information between features (for
     each selected feature, dependency to target should be > than to each other selected feature).
-    Inspired by Yu et. al (2003): "Feature Selection for High-Dimensional Data: A Fast Correlation-
+
+    Inspired by Yu et al. (2003): "Feature Selection for High-Dimensional Data: A Fast Correlation-
     Based Filter Solution" (which searches heuristically rather than optimizing exactly).
     White-box optimization approach.
     """
@@ -495,7 +490,7 @@ class MRMRSelector(WhiteBoxFeatureSelector):
     # interaction terms (using real variables specific to training-set feature qualities instead of
     # binary interaction variables), we cannot give a closed-form expression for the test objective
     # here, but return the train objective twice and calculate the actual test objective in
-    # "select_and_evaluate()".
+    # via "compute_test_objective()" called in "select_and_evaluate()".
     # See the superclass for a description of the parameters and the return value.
     def create_objectives(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
@@ -509,7 +504,8 @@ class MRMRSelector(WhiteBoxFeatureSelector):
             for j_1 in range(len(s)):
                 # Linearization: z_i = x_i * A_i(x) (follows Equation (14) in Nguyen et al. (2010)
                 # "Towards a Generic Feature-Selection Measure for Intrusion Detection" except there
-                # is no variable "y"; we have max instead of min objective, but since the redundancy
+                # is no variable "y" since we do not have a fractional expression (we only divide by
+                # constants); we have max instead of min objective, but since the redundancy
                 # term is subtracted (should be minimized), we can still use Equation (14))
                 z_j = solver.NumVar(name=f'z_{i}_{j_1}', lb=0, ub=M)
                 A_j = solver.Sum([self._mi_features_train[j_1][j_2] * s[j_2]
@@ -571,8 +567,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         objective = 0
         solver.Maximize(objective)
 
-    # Decide if the overall quality objective has improved based on some aggregation function (which
-    # is stored in a field of "self").
+    # Decide if the overall feature-set quality has improved based on some aggregation function
+    # (which is stored in a field of "self").
     # - "old_Q_list": Qualities of the previously selected feature sets.
     # - "new_Q_list": Qualities of the newly selected feature sets.
     def has_objective_improved(self, old_Q_list: Iterable[float],

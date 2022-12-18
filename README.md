@@ -11,7 +11,7 @@ We'll link the experimental data, too.)
 
 > Bach, Jakob. "Finding Optimal Diverse Feature Sets via Alternative Feature Selection"
 
-(To be submitted at arXiv.
+(To be submitted to arXiv.
 Currently, there is no dedicated tag since the coding is in progress.
 Once the paper is published, we'll link it here.
 We'll link the experimental data, too.)
@@ -45,7 +45,7 @@ only these two files might be relevant for you:
 - `afs.py`: Classes for alternative feature selection.
   `AlternativeFeatureSelector` is the abstract superclass.
   It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
-  two search procedures, i.e., sequential as well as simultaneous (sum-objective and min-objective).
+  two search procedures, i.e., sequential as well as simultaneous (summed-quality and min-quality).
   To integrate a new feature-selection method, you need to create a subclass.
   The subclass needs to define the optimization problem of the feature-selection method
   (the objective function and maybe constraints) in `initialize_solver()` and
@@ -61,7 +61,7 @@ only these two files might be relevant for you:
   `LinearQualityFeatureSelector` defines an objective that sums up the quality of individual
   features, so your subclass only has to define how to compute these qualities.
 - `prediction.py`: Functions to make predictions for the experimental pipeline
-  and two of our feature-selection methods that use prediction models (model-based and wrapper).
+  and two of our feature-selection methods that use prediction models (model importance and wrapper).
 
 ## Demo
 
@@ -73,15 +73,16 @@ Running alternative feature selection only requires three steps:
     - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
 3) Run the search for alternatives:
     - Method name (`search_sequentially()` / `search_simultaneously()`) determines whether
-      a sequential or a simultaneous search is run.
+      a sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s (MI, FCBF, and
+      model-based importance) also support the heuristic procedure `search_greedy_replacement()`.
     - `k` determines the number of features to be selected.
     - `num_alternatives` determines ... you can guess what.
     - `tau_abs` determines by how many features the feature sets should differ.
       You can also provide a relative value (from the interval `[0,1]`) via `tau`,
       and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
-    - `objective_agg` switches between the min-objective and the sum-objective in a simultaneous
-      search. Has no effect in sequential search (which only returns one feature set, so there is no
-      need to aggregate feature-set quality over feature sets).
+    - `objective_agg` switches between the min-quality objective and the summed-quality objective in
+      a simultaneous search. Has no effect in sequential search (which only returns one feature set,
+      so there is no need to aggregate feature-set quality over feature sets).
 
 ```python
 import afs
@@ -217,8 +218,8 @@ python -m run_experiments
 ```
 
 Depending on your hardware, this might take several days.
-We had a runtime of 141 hours on a server with an `AMD EPYC 7551` [CPU](https://www.amd.com/en/products/cpu/amd-epyc-7551)
-(32 physical cores, base clock of 2.0 GHz).
+For the arXiv paper, we had a runtime of 141 hours on a server with an `AMD EPYC 7551`
+[CPU](https://www.amd.com/en/products/cpu/amd-epyc-7551) (32 physical cores, base clock of 2.0 GHz).
 In case the pipeline is nearly finished but doesn't make progress anymore,
 the solver might have silently crashed (which happened in the past with `Cbc` as the solver, though
 we didn't encounter the phenomenon with the current solver `SCIP`).
