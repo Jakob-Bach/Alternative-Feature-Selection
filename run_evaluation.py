@@ -22,6 +22,7 @@ import data_handling
 
 
 plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['figure.max_open_warning'] = 0
 
 
 # Main-routine: run complete evaluation pipeline. To that end, read results from the "results_dir"
@@ -75,13 +76,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n---- Alternatives (Constraints) ----')
 
-    print('\nHow often do certain optimization statuses occur?')
+    print('\nHow is the optimization status distributed (for all experimental settings)?')
     print(results['optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
 
     print('\n------ Datasets ------')
 
     # Table 1 (arXiv version)
-    print('\nTable: Dataset overview\n')
+    print('\n## Table: Dataset overview ##\n')
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
     dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': 'm',
@@ -94,17 +95,20 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n------ Datasets ------')
 
-    print('\nHow does median feature-set quality (all experim. settings) differ between datasets?')
+    print('\nHow is the median feature-set quality per dataset distributed (for all experimental',
+          'settings)?')
     print(results.groupby('dataset_name')[['train_objective', 'decision_tree_test_mcc']].median(
         ).describe().round(2))
 
-    print('\nHow does feature set-quality (all experim. settings) (Spearman-)correlate with "n"?')
+    print('\nHow does the feature set-quality (Spearman-)correlate with dataset dimensionality "n"',
+          '(for all experimental settings)?')
     print(results[quality_metrics].corrwith(results['n'], method='spearman').round(2))
 
-    print('\nHow does feature set-quality (all experim. settings) (Spearman-)correlate with "k/n"?')
+    print('\nHow does the feature set-quality (Spearman-)correlate with relative feature-set size',
+          '"k/n" (for all experimental settings)?')
     print(results[quality_metrics].corrwith(results['k'] / results['n'], method='spearman').round(2))
 
-    # Figure 1 (arXiv version): Impact of feature-set size "k" and dataset size "n"
+    # Figure 1 (arXiv version): Feature-set quality by feature-set size "k" and dataset size "n"
     plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
                            (results['n_alternative'] == 0) & (results['fs_name'] == 'MI')].copy()
     plot_results['k/n'] = plot_results['k'] / plot_results['n']
@@ -129,10 +133,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Prediction models and overfitting --')
 
-    print('\nHow is prediction performance distributed for different models?')
+    print('\nHow is the prediction performance distributed for different prediction models (for',
+          'all experimental settings)?')
     print(results[[x for x in results.columns if '_mcc' in x]].describe().round(2).transpose())
 
-    # Figure 2a (arXiv version): Distribution of train-test difference for evaluation metrics
+    # Figure 2a (arXiv version): Difference in feature-set quality between training set and test set
+    # by evaluation metric and feature-selection method
     metric_pairs = {
         'Q': ('train_objective', 'test_objective'),
         '$MCC^{\\mathrm{tree}}$': ('decision_tree_train_mcc', 'decision_tree_test_mcc'),
@@ -157,7 +163,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Correlation between evaluation metrics --')
 
-    # Figure 2b (arXiv version): Correlation between evaluation metrics
+    # Figure 2b (arXiv version): Correlation between evaluation metrics for feature-set quality
     plot_results = results[quality_metrics].corr(method='spearman').round(2)
     plot_results.rename(columns=metric_name_mapping, index=metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
@@ -173,11 +179,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Prediction performance --')
 
-    print('\nHow does the decision-tree test-set prediction performance differ between',
-          'feature-selection methods for the original feature sets of sequential search?')
+    print('\nHow is the decision-tree test-set prediction performance distributed for different',
+          'feature-selection methods (for the original feature sets of sequential search)?')
     print(plot_results.groupby('fs_name')['decision_tree_test_mcc'].describe().round(2))
 
-    # Figure 3a (arXiv version): Impact of feature-set size "k" and feature selector on test MCC
+    # Figure 3a (arXiv version): Test-set prediction performance by feature-set size "k" and
+    # feature-selection method
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='Set2',
@@ -191,25 +198,28 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-fs-method-k-decision-tree-test-mcc.pdf')
 
-    print('\nHow many iterations did wrapper search perform for the original feature sets of',
-          'sequential search?')
+    print('\nHow is the iteration count of greedy-wrapper feature selection distributed (for the',
+          'original feature sets of sequential search)?')
     print(plot_results['wrapper_iters'].describe().round(2))
 
-    print('\nHow many iterations did wrapper search perform over all experimental settings?')
+    print('\nHow is the iteration count of greedy-wrapper feature selection distributed (for all',
+          'experimental settings)?')
     print(results['wrapper_iters'].describe().round(2))
 
-    print('\nHow does the optimization status differ between feature-selection methods?')
+    print('\nHow is the optimization status distributed for different feature-selection methods',
+          '(for all experimental settings)?')
     print(pd.crosstab(results['optimization_status'], results['fs_name'],
                       normalize='columns').applymap('{:.2%}'.format))
 
-    print('\nHow does the optimization status differ between feature-selection methods for the',
-          'original feature sets of sequential search?')
+    print('\nHow is the optimization status distributed for different feature-selection methods',
+          '(for the original feature sets of sequential search)?')
     print(pd.crosstab(plot_results['optimization_status'], plot_results['fs_name'],
                       normalize='columns').applymap('{:.2%}'.format))
 
     print('\n-- Influence of feature-set size "k" --')
 
-    # Figure 3b (arXiv version): Distribution of difference of metrics between feature-set sizes "k"
+    # Figure 3b (arXiv version): Difference in feature-set quality between feature-set sizes "k" by
+    # evaluation metric and feature-selection method
     plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
     plot_results = plot_results[['dataset_name', 'split_idx', 'fs_name', 'k'] + plot_metrics].copy()
     plot_results = plot_results.pivot(index=['dataset_name', 'split_idx', 'fs_name'], columns='k',
@@ -234,8 +244,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-fs-method-k-metric-diff.pdf')
 
-    print('\nHow do the evaluation metrics differ between k=10 and k=5 on median for the original',
-          'feature sets of sequential search?')
+    print('\nWhat is the median feature-set-quality difference per experimental setting between',
+          'k=10 and k=5 for different feature-selection methods (for the original feature sets of',
+          'sequential search)?')
     print(plot_results.groupby(['Metric', 'fs_name']).median().round(2))
 
     print('\n------ Searching Alternatives ------')
@@ -256,15 +267,16 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Variance in feature-set quality --')
 
-    print('\nHow does the standard deviation of feature-set quality within one search (with k=5',
-          'and 1-5 alternatives) depend on the feature-selection method, search method and number',
-          'of alternatives (on median)?')
+    print('\nWhat is the median standard deviation of feature-set quality within one search run',
+          'for different feature-selection methods, search methods, and numbers of alternatives',
+          '(for k=5 and 0-5 alternatives)?')
     for metric in plot_metrics:
         print(comparison_results.groupby(group_cols)[metric].std().reset_index().groupby(
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
 
-        # Figures 4a, 4c, 4e (arXiv version): Impact of search method on stddev of metrics
+        # Figures 4a, 4c, 4e (arXiv version): Standard deviation of feature-set quality in search
+        # runs by search method
         plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
         plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
         plt.figure(figsize=(4, 3))
@@ -283,16 +295,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Average value of feature-set quality --')
 
-    print('\nHow does the mean of feature-set quality within one search (with k=5 and 1-5',
-          'alternatives) depend on the feature-selection method, search method, and number of',
-          'alternatives (on median)?')
+    print('\nWhat is the median average value of feature-set quality within one search run for',
+          'different feature-selection methods, search methods, and numbers of alternatives',
+          '(for k=5 and 0-5 alternatives)?')
     for metric, ylim, min_tick in zip(
             plot_metrics, [(-0.05, 1.05), (-0.05, 0.65), (-0.3, 1.05)], [0, 0, -0.2]):
         print(comparison_results.groupby(group_cols)[metric].mean().reset_index().groupby(
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
 
-        # Figures 4b, 4d, 4f (arXiv version): Impact of search method on mean objective
+        # Figures 4b, 4d, 4f (arXiv version): Average feature-set quality in search runs by search
+        # method
         plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
         plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
         plt.figure(figsize=(4, 3))
@@ -309,7 +322,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-mean-{metric.replace("_", "-")}.pdf')
 
-    # Figure 5a (arXiv version): Impact of search method and feature selector on test MCC
+    # Figure 5a (arXiv version): Test-set prediction performance by search method and
+    # feature-selection method
     plot_results = comparison_results[group_cols + ['decision_tree_test_mcc']].copy()
     plot_results = plot_results.groupby(group_cols)['decision_tree_test_mcc'].mean().reset_index()
     plt.figure(figsize=(5, 5))
@@ -326,16 +340,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-search-fs-method-decision-tree-test-mcc.pdf')
 
-    print('\nWhat is the median of the average feature-set quality difference "simultaneous search',
-          '(sum-objective) minus sequential search" (with k=5 and 1-5 alternatives; each',
-          'comparison for the same search setting)?')
+    print('\nWhat is the median feature-set-quality difference per experimental setting between',
+          'simltaneous search (summed-quality objective) and sequential search for different',
+          'feature-selection methods and numbers of alternatives (for k=5 and 0-5 alternatives)?')
     plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index(
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
                 values='train_objective').reset_index()
     plot_results['sim - seq'] = plot_results['sim. (sum)'] - plot_results['seq.']
     print(plot_results.groupby(['fs_name', 'num_alternatives'])['sim - seq'].median().round(3))
 
-    # Figure 5b: Distribution of difference of evaluation metrics between search methods
+    # Figure 5b: Difference in feature-set quality between simultaneous and sequential search by
+    # evaluation metric and feature-selection method
     plot_results = comparison_results.groupby(group_cols)[plot_metrics].mean().reset_index(
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
                 values=plot_metrics).reset_index()
@@ -379,14 +394,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     ])
     plot_results = plot_results[plot_results['fs_name'] != 'Greedy Wrapper']
 
-    print('\nHow often does each optimization status occurr for each combination of search method',
-          '(with k=5 and 1-5 alternatives) and feature selector (excluding greedy, where status',
-          'only describes last solver run)?')
+    print('\nHow is the optimization status distributed for different feature-selection methods',
+          '(excluding Greedy Wrapper) and search methods (for k=5 and 0-5 alternatives)?')
     print(plot_results.groupby(['fs_name', 'search_name'])['optimization_status'].value_counts(
         normalize=True).round(4).apply('{:.2%}'.format))
 
     # Table 3 (arXiv version)
-    print('\nTable: Impact of search and feature selector on optimization status\n')
+    print('\n## Table: Optimization status by search method and feature-selection method (for k=5',
+          'and 0-5 alternatives) ##\n')
     print_results = (plot_results.groupby(['fs_name', 'search_name'])[
         'optimization_status'].value_counts(normalize=True) * 100).rename('Frequency').reset_index()
     print_results = print_results.pivot(index=['fs_name', 'search_name'], values='Frequency',
@@ -396,8 +411,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(print_results.style.format('{:.2f}\\%'.format, subset=status_order).hide(
         axis='index').to_latex(hrules=True))
 
-    print('\nHow does the optimization status depend on the number of alternatives in simultaneous',
-          'search (with sum-objective, k=5, and excluding greedy FS)?')
+    print('\nHow is the optimization status distributed for different numbers of alternatives',
+          '(for simultaneous search with summed-quality objective, k=5, and excluding Greedy',
+          'Wrapper)?')
     print(pd.crosstab(plot_results.loc[plot_results['search_name'] == 'sim. (sum)',
                                        'optimization_status'],
                       plot_results.loc[plot_results['search_name'] == 'sim. (sum)',
@@ -405,8 +421,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                       normalize='columns').applymap('{:.2%}'.format))
 
     # Table 4 (arXiv version)
-    print('\nTable: Impact of number of alternatives on simultaneous search (sum-objective)',
-          'optimization status\n')
+    print('\n## Table: Optimization status by number of alternatives (for simultaneous search with',
+          'summed-quality objective, k=5, and excluding Greedy Wrapper) ##\n')
     print_results = plot_results[plot_results['search_name'] == 'sim. (sum)']
     print_results = (print_results.groupby('num_alternatives')['optimization_status'].value_counts(
         normalize=True) * 100).rename('Frequency').reset_index()
@@ -435,38 +451,41 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         ]
     ])
 
-    print('\nHow does the optimization time depend on the feature selector in sequential search',
-          '(with k=5 and 1-5 alternatives)?')
+    print('\nHow is the optimization time distributed for different feature-selection methods',
+          '(for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby('fs_name')[
         'optimization_time'].describe().round(3))
 
-    print('\nHow does the optimization time depend on the feature selector in simultaneous search',
-          '(with sum-objective and k=5)?')
+    print('\nHow is the optimization time distributed for different feature-selection methods',
+          '(for simultaneous search with summed-quality objective and k=5)?')
     print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
         'fs_name')['optimization_time'].describe().round(2))
 
     # Table 5 (arXiv version)
-    print('\nTable: Impact of search and feature selector on median optimization time\n')
+    print('\n## Table: Median optimization time by feature-selection method and search method',
+          '(for k=5 and 0-5 alternatives) ##\n')
     print_results = plot_results.groupby(['fs_name', 'search_name'])[
         'optimization_time'].median().reset_index()
     print_results = print_results.pivot(index='fs_name', columns='search_name')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
-    print('\nHow does the median optimization time develop over the number of alternatives for',
-          'different feature selectors in sequential search (with k=5)?')
+    print('\nWhat is the median optimization time for different feature-selection methods and',
+          'numbers of alternativess (for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(
         ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index().pivot(
             index='num_alternatives', columns='fs_name').round(3))
 
-    print('\nHow does the median optimization time develop over the number of alternatives for',
-          'different feature selectors in simultaneous search (with sum-objective and k=5)?')
+    print('\nWhat is the median optimization time for different feature-selection methods and',
+          'numbers of alternativess (for simultaneous search with summed-quality objective and',
+          'k=5)?')
     print_results = plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
         ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index()
     print_results = print_results.pivot(index='num_alternatives', columns='fs_name')
     print(print_results.round(3))
 
     # Table 6 (arXiv version)
-    print('\nTable: Impact of search and number of alternatives on sim-search optimization time\n')
+    print('\n## Table: Median optimization time by number of alternatives and feature-selection',
+          'method (for simultaneous search with summed-quality objective and k=5) ##\n')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
     print('\n---- Number of Alternatives ----')
@@ -497,13 +516,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
             normalization_func)  # applies function to each column independently
 
-        print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
-              'experimental setting) develop over the iterations of sequential search (k=5)?')
+        print(f'\nWhat is the median feature-set quality ({normalization_name}-normalized per',
+              'experimental setting) for different iterations (alternatives) and feature-selection',
+              'methods (for sequential search with k=5)?')
         for metric in plot_metrics:
             print(norm_results.groupby(['n_alternative', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='n_alternative', columns='fs_name').round(2))
 
-        # Figures 6a-6d (arXiv version): Impact of number of alternatives on feature-set quality
+        # Figures 6a-6d (arXiv version): Feature-set quality by number of alternatives and
+        # evaluation metric
         plot_results = norm_results[(norm_results['fs_name'] == 'MI')].melt(
             id_vars='n_alternative', value_vars=plot_metrics, var_name='Metric',
             value_name='quality')
@@ -523,8 +544,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
         if (func_name == 'max') and (not fillna):
             for metric in ['train_objective', 'decision_tree_test_mcc']:
-                # Figures 7a, 7b (arXiv version): Impact of number of alternatives and feature
-                # selector on feature-set quality
+                # Figures 7a, 7b (arXiv version): Feature-set quality by number of alternatives and
+                # feature-selection method
                 plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].median(
                     ).reset_index()
                 plt.figure(figsize=(5, 5))
@@ -547,8 +568,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Optimization status --')
 
     for k in results['k'].unique():
-        print('\nHow does the optimization status differ between the number of alternatives in',
-              f'sequential search (with k={k}) for MI feature selection?')
+        print('\nHow is the optimization status distributed for different iterations',
+              f'(alternatives) (for sequential search with k={k} and MI as feature-selection',
+              'method)?')
         print(pd.crosstab(
             results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'seq.') &
                         (results['k'] == k), 'n_alternative'],
@@ -580,17 +602,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
             normalization_func)  # applies function to each column independently
 
-        print(f'\nHow does the median feature-set quality ({normalization_name}-normalized per',
-              'experimental setting) develop over "tau" for different feature selectors in',
-              'sequential search (k=10)?')
+        print(f'\nWhat is the median feature-set quality ({normalization_name}-normalized per',
+              'experimental setting) for different dissimilarity thresholds "tau" and',
+              'feature-selection methods (for sequential search with k=10)?')
         for metric in plot_metrics:
             print(norm_results.groupby(['tau_abs', 'fs_name'])[metric].median().reset_index(
                 ).pivot(index='tau_abs', columns='fs_name').round(2))
 
         for metric in (['train_objective', 'test_objective'] if func_name == 'max'
                        else ['decision_tree_test_mcc']):
-            # Figures 8a-8f (arXiv version): Impact of number of alternatives and "tau" on
-            # feature-set quality
+            # Figures 8a-8f (arXiv version): Feature-set quality by number of alternatives and
+            # dissimilarity threshold "tau"
             plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
                 ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
             plot_results['tau'] = plot_results['tau_abs'] / 10
@@ -616,8 +638,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
         if (func_name == 'max') and (not fillna):
             for metric in ['train_objective', 'decision_tree_test_mcc']:
-                # Figures 10a, 10b (arXiv version): Impact of "tau" and feature selector on
-                # feature-set quality
+                # Figures 10a, 10b (arXiv version): Feature-set quality by dissimilarity threshold
+                # "tau" and feature selection-method
                 plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].median(
                     ).reset_index()
                 plot_results['tau'] = plot_results['tau_abs'] / 10
@@ -645,13 +667,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plot_results = results[(results['fs_name'] == 'MI') & (results['k'] == k) &
                                (results['search_name'] == 'seq.')]
 
-        print('\nHow does the optimization status differ between the dissimilarity thresholds in',
-              f'sequential search (with k={k}) for MI feature selection?')
+        print('\nHow is the optimization status distributed for different dissimilarity thresholds',
+              f'"tau" (for sequential search with k={k} and MI as feature-selection method)?')
         print(pd.crosstab(plot_results['tau_abs'], plot_results['optimization_status'],
                           normalize='index').applymap('{:.2%}'.format))
 
-        # Figures 9a, 9b (arXiv version): Impact of number of alternatives and "tau" on
-        # optimization status
+        # Figures 9a, 9b (arXiv version): Optimization status by number of alternatives and
+        # dissimilarity threshold "tau"
         assert plot_results['optimization_status'].isin(['Infeasible', 'Optimal']).all()
         plot_results = plot_results.groupby(['tau_abs', 'n_alternative'])[
             'optimization_status'].agg(lambda x: (x == 'Optimal').sum() / len(x)).reset_index()
@@ -676,8 +698,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n------ Composition of Feature Sets (not used in paper) ------')
 
-    print('\nHow many new features occur in a feature set from one alternative to next in',
-          'sequential search (k=10) for MI as feature selector?')
+    print('\nHow many new features occur in a feature set from one alternative to the next',
+          '(for sequential search with k=10 and MI as feature-selection method)?')
     feature_diff_results = seq_results[['selected_idxs', 'train_objective', 'n_alternative'] +
                                        group_cols].copy()
     feature_diff_results['prev_selected_idxs'] = feature_diff_results.groupby(
@@ -705,4 +727,4 @@ if __name__ == '__main__':
                         dest='plot_dir', help='Output directory for plots.')
     print('Evaluation started.')
     evaluate(**vars(parser.parse_args()))
-    print('Plots created and saved.')
+    print('\nPlots created and saved.')
