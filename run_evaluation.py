@@ -442,12 +442,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         'sim')].groupby(group_cols)['optimization_time'].nunique() == 1).all())
     plot_results = pd.concat([
         comparison_results[comparison_results['search_name'] == 'seq.'].groupby(
-            group_cols)['optimization_time'].sum().reset_index()[
-                ['fs_name', 'search_name', 'num_alternatives', 'optimization_time']
+            group_cols + ['n'])['optimization_time'].sum().reset_index()[
+                ['n', 'fs_name', 'search_name', 'num_alternatives', 'optimization_time']
         ],
         comparison_results[comparison_results['search_name'].str.startswith('sim')].groupby(
-            group_cols).first().reset_index()[
-                ['fs_name', 'search_name', 'num_alternatives', 'optimization_time']
+            group_cols + ['n']).first().reset_index()[
+                ['n', 'fs_name', 'search_name', 'num_alternatives', 'optimization_time']
         ]
     ])
 
@@ -470,13 +470,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
     print('\nWhat is the median optimization time for different feature-selection methods and',
-          'numbers of alternativess (for sequential search with k=5 and 0-5 alternatives)?')
+          'numbers of alternatives (for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(
         ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index().pivot(
             index='num_alternatives', columns='fs_name').round(3))
 
     print('\nWhat is the median optimization time for different feature-selection methods and',
-          'numbers of alternativess (for simultaneous search with summed-quality objective and',
+          'numbers of alternatives (for simultaneous search with summed-quality objective and',
           'k=5)?')
     print_results = plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
         ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index()
@@ -487,6 +487,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n## Table: Median optimization time by number of alternatives and feature-selection',
           'method (for simultaneous search with summed-quality objective and k=5) ##\n')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
+
+    print('\nWhat is the median optimization time for different feature-selection methods and',
+          'dataset dimensionalities "n" (for sequential search with k=5 and 0-5 alternatives)?')
+    print(plot_results[plot_results['search_name'] == 'seq.'].groupby(['fs_name', 'n'])[
+        'optimization_time'].median().reset_index().pivot(index='n', columns='fs_name').round(3))
+
+    print('\nWhat is the median optimization time for different feature-selection methods and',
+          'dataset dimensionalities "n" (for simultaneous search with summed-quality objective and',
+          'k=5)?')
+    print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(['fs_name', 'n'])[
+        'optimization_time'].median().reset_index().pivot(index='n', columns='fs_name').round(3))
 
     print('\n---- Number of Alternatives ----')
 
