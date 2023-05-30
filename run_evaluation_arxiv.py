@@ -341,7 +341,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.savefig(plot_dir / 'afs-impact-search-fs-method-decision-tree-test-mcc.pdf')
 
     print('\nWhat is the median feature-set-quality difference per experimental setting between',
-          'simltaneous search (summed-quality objective) and sequential search for different',
+          'simultaneous search (summed-quality objective) and sequential search for different',
           'feature-selection methods and numbers of alternatives (for k=5 and 0-5 alternatives)?')
     plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index(
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
@@ -650,7 +650,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         if (func_name == 'max') and (not fillna):
             for metric in ['train_objective', 'decision_tree_test_mcc']:
                 # Figures 10a, 10b (arXiv version): Feature-set quality by dissimilarity threshold
-                # "tau" and feature selection-method
+                # "tau" and feature-selection method
                 plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].median(
                     ).reset_index()
                 plot_results['tau'] = plot_results['tau_abs'] / 10
