@@ -1,9 +1,9 @@
 """Run evaluation
 
-Script to compute summary statistics and create plots for the paper. Should be run after the
-experimental pipeline, as this script requires the pipeline's outputs as inputs.
+Script to compute summary statistics and create plots for the CIKM version of the paper. Should be
+run after the experimental pipeline, as this script requires the pipeline's outputs as inputs.
 
-Usage: python -m run_evaluation --help
+Usage: python -m run_evaluation_cikm --help
 """
 
 
@@ -21,7 +21,7 @@ import seaborn as sns
 import data_handling
 
 
-plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['font.family'] = 'Linux Biolinum'  # fits to serif font "Libertine" from ACM template
 plt.rcParams['figure.max_open_warning'] = 0
 
 
@@ -111,16 +111,16 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
         plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
         plt.figure(figsize=(4, 3))
-        plt.rcParams['font.size'] = 15
+        plt.rcParams['font.size'] = 14
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=1, hue_order=search_name_plot_order)
-        plt.xlabel('Number of alternatives $a$')
+                    palette='RdPu', fliersize=1, hue_order=search_name_plot_order)
+        plt.xlabel('Number of alternatives')
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
         plt.ylim(-0.05, 0.35)
-        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
                    columnspacing=1, framealpha=0, ncols=2)
-        plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
+        plt.figtext(x=0.17, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
@@ -143,16 +143,16 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
     plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
     plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 15
+    plt.rcParams['font.size'] = 14
     sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                palette='Set2', fliersize=1, hue_order=search_name_plot_order)
-    plt.xlabel('Number of alternatives $a$')
+                palette='RdPu', fliersize=1, hue_order=search_name_plot_order)
+    plt.xlabel('Number of alternatives')
     plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
     plt.ylim((-0.05, 1.05))
     plt.yticks(np.arange(start=0, stop=1.05, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(0, -0.1),
                columnspacing=1, framealpha=0, ncols=2)
-    plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
+    plt.figtext(x=0.17, y=0.13, s='Search', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / f'afs-impact-search-mean-{metric.replace("_", "-")}.pdf')
 
@@ -227,34 +227,34 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     ])
 
     # Table 2
-    print('\n## Table: Median optimization time by feature-selection method and search method',
+    print('\n## Table: Mean optimization time by feature-selection method and search method',
           '(for k=5 and 0-5 alternatives) ##\n')
     print_results = plot_results.groupby(['fs_name', 'search_name'])[
-        'optimization_time'].median().reset_index()
+        'optimization_time'].mean().reset_index()
     print_results = print_results.pivot(index='fs_name', columns='search_name')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'numbers of alternatives (for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(
-        ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index().pivot(
+        ['fs_name', 'num_alternatives'])['optimization_time'].mean().reset_index().pivot(
             index='num_alternatives', columns='fs_name').round(3))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'numbers of alternatives (for simultaneous search with sum-aggregation and k=5)?')
     print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
-        ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index().pivot(
+        ['fs_name', 'num_alternatives'])['optimization_time'].mean().reset_index().pivot(
             index='num_alternatives', columns='fs_name').round(3))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'dataset dimensionalities "n" (for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(['fs_name', 'n'])[
-        'optimization_time'].median().reset_index().pivot(index='n', columns='fs_name').round(3))
+        'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'dataset dimensionalities "n" (for simultaneous search with sum-aggregation and k=5)?')
     print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(['fs_name', 'n'])[
-        'optimization_time'].median().reset_index().pivot(index='n', columns='fs_name').round(3))
+        'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 
     print('\n------ User Parameters "a" and "tau" ------')
 
@@ -296,8 +296,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
                 ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
             plot_results['tau'] = plot_results['tau_abs'] / 10
-            plt.figure(figsize=(4, 3))
-            plt.rcParams['font.size'] = 15
+            plt.figure(figsize=(5, 3))
+            plt.rcParams['font.size'] = 18
             sns.lineplot(x='n_alternative', y=metric, hue='tau', data=plot_results, palette='RdPu',
                          hue_norm=(-0.2, 1), legend=False)
             # Use color scale instead of standard line plot legend; start color scaling at -0.2, so
@@ -316,11 +316,32 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
                                     f'{normalization_name}.pdf'))
 
-        # Figure 3c: Feature-set quality by dissimilarity threshold "tau" and feature-selection
-        # method
-        if (func_name == 'max') and (not fillna):
+        if fillna and (func_name == 'max'):
             metric = 'train_objective'
-            plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].median(
+
+            # Figure 3b: Feature-set quality by number of alternatives and feature-selection method
+            plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].mean(
+                ).reset_index()
+            plt.figure(figsize=(5, 5))
+            plt.rcParams['font.size'] = 18
+            sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
+                         data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                         style_order=fs_name_plot_order)
+            plt.xlabel('Number of alternative')
+            plt.xticks(range(11))
+            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+            plt.ylim(-0.05, 1.05)
+            plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
+                       bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
+            plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+            plt.tight_layout()
+            plt.savefig(plot_dir / ('afs-impact-num-alternatives-fs-method-' +
+                                    f'{metric.replace("_", "-")}-{normalization_name}.pdf'))
+
+            # Figure 3c: Feature-set quality by dissimilarity threshold "tau" and feature-selection
+            # method
+            plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean(
                 ).reset_index()
             plot_results['tau'] = plot_results['tau_abs'] / 10
             plt.figure(figsize=(5, 5))
@@ -339,7 +360,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
             plt.tight_layout()
             plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
-                                    'max.pdf'))
+                                    f'{normalization_name}.pdf'))
 
     print('\n-- Optimization status --')
 
@@ -352,7 +373,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         'optimization_status'].agg(lambda x: (x == 'Optimal').sum() / len(x)).reset_index()
     plot_results['tau'] = plot_results['tau_abs'] / 10
     plt.figure(figsize=(4, 3))
-    plt.rcParams['font.size'] = 15
+    plt.rcParams['font.size'] = 14
     sns.lineplot(x='n_alternative', y='optimization_status', hue='tau', data=plot_results,
                  palette='RdPu', hue_norm=(-0.2, 1), legend=False)
     cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
@@ -367,40 +388,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.gca().yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
     plt.ylim(-0.05, 1.05)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'afs-impact-num-alternatives-tau-optimization-status-k-10.pdf')
+    plt.savefig(plot_dir / 'afs-impact-num-alternatives-tau-optimization-status.pdf')
 
     print('\n-- Influence of feature-selection method --')
-
-    # Figure 3b: Feature-set quality by number of alternatives and feature-selection method
-    # Different "k" then above, so we have to run normalization again
-    seq_results = results[(results['search_name'] == 'seq.') & (results['k'] == 5)].copy()
-    metric = 'train_objective'
-    # See above for reasons for shifting values of metrics
-    condition = seq_results['fs_name'].isin(('mRMR', 'Greedy Wrapper'))
-    seq_results.loc[condition, metric] = (seq_results.loc[condition, metric] + 1) / 2
-    norm_results = seq_results[group_cols + [metric, 'n_alternative']].copy()
-    norm_results[metric] = norm_results.groupby(group_cols)[metric].apply(
-        normalization_funcs['max'])
-    plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].median(
-        ).reset_index()
-    plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 18
-    sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
-                 data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
-                 style_order=fs_name_plot_order)
-    plt.xlabel('Number of alternative')
-    plt.xticks(range(11))
-    plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-    plt.ylim(0.78, 1.02)
-    plt.yticks(np.arange(start=0.8, stop=1.05, step=0.05))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
-               bbox_to_anchor=(-0.2, -0.1), framealpha=0, handletextpad=0.2)
-    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
-    plt.tight_layout()
-    plt.savefig(plot_dir / ('afs-impact-num-alternatives-fs-method-' +
-                            f'{metric.replace("_", "-")}-max.pdf'))
-
-    # Figure 3c: see above
 
 
 # Parse some command-line arguments and run the main routine.
