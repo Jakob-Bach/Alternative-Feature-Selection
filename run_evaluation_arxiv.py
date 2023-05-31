@@ -95,9 +95,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n------ Datasets ------')
 
-    print('\nHow is the median feature-set quality per dataset distributed (for all experimental',
+    print('\nHow is the mean feature-set quality per dataset distributed (for all experimental',
           'settings)?')
-    print(results.groupby('dataset_name')[['train_objective', 'decision_tree_test_mcc']].median(
+    print(results.groupby('dataset_name')[['train_objective', 'decision_tree_test_mcc']].mean(
         ).describe().round(2))
 
     print('\nHow does the feature set-quality (Spearman-)correlate with dataset dimensionality "n"',
@@ -152,7 +152,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Train-test difference', hue='fs_name', data=plot_results,
-                palette='Set2', fliersize=1, hue_order=fs_name_plot_order)
+                palette='RdPu', fliersize=1, hue_order=fs_name_plot_order)
     plt.ylim(-0.55, 1.35)
     plt.yticks(np.arange(start=-0.4, stop=1.3, step=0.2))
     plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
@@ -187,7 +187,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # feature-selection method
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
-    sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='Set2',
+    sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='RdPu',
                 fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Feature-set size $k$')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
@@ -233,7 +233,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
-    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
+    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='RdPu',
                 fliersize=1, hue_order=fs_name_plot_order)
     plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.65, 0.65)
@@ -282,7 +282,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=1, hue_order=search_name_plot_order)
+                    palette='RdPu', fliersize=1, hue_order=search_name_plot_order)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
@@ -311,7 +311,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='Set2', fliersize=1, hue_order=search_name_plot_order)
+                    palette='RdPu', fliersize=1, hue_order=search_name_plot_order)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
         plt.ylim(ylim)
@@ -329,7 +329,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='search_name', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
-                palette='Set2', fliersize=1, hue_order=fs_name_plot_order)
+                palette='RdPu', fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Search')
     plt.xticks(rotation=10, horizontalalignment='right')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
@@ -364,7 +364,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
-    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='Set2',
+    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='RdPu',
                 fliersize=1, hue_order=fs_name_plot_order)
     plt.ylabel('Difference sim. vs. seq.')
     plt.ylim(-0.35, 0.35)
@@ -462,42 +462,42 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         'fs_name')['optimization_time'].describe().round(2))
 
     # Table 5 (arXiv version)
-    print('\n## Table: Median optimization time by feature-selection method and search method',
+    print('\n## Table: Mean optimization time by feature-selection method and search method',
           '(for k=5 and 0-5 alternatives) ##\n')
     print_results = plot_results.groupby(['fs_name', 'search_name'])[
-        'optimization_time'].median().reset_index()
+        'optimization_time'].mean().reset_index()
     print_results = print_results.pivot(index='fs_name', columns='search_name')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'numbers of alternatives (for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(
-        ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index().pivot(
+        ['fs_name', 'num_alternatives'])['optimization_time'].mean().reset_index().pivot(
             index='num_alternatives', columns='fs_name').round(3))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'numbers of alternatives (for simultaneous search with summed-quality objective and',
           'k=5)?')
     print_results = plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
-        ['fs_name', 'num_alternatives'])['optimization_time'].median().reset_index()
+        ['fs_name', 'num_alternatives'])['optimization_time'].mean().reset_index()
     print_results = print_results.pivot(index='num_alternatives', columns='fs_name')
     print(print_results.round(3))
 
     # Table 6 (arXiv version)
-    print('\n## Table: Median optimization time by number of alternatives and feature-selection',
+    print('\n## Table: Mean optimization time by number of alternatives and feature-selection',
           'method (for simultaneous search with summed-quality objective and k=5) ##\n')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'dataset dimensionalities "n" (for sequential search with k=5 and 0-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(['fs_name', 'n'])[
-        'optimization_time'].median().reset_index().pivot(index='n', columns='fs_name').round(3))
+        'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 
-    print('\nWhat is the median optimization time for different feature-selection methods and',
+    print('\nWhat is the mean optimization time for different feature-selection methods and',
           'dataset dimensionalities "n" (for simultaneous search with summed-quality objective and',
           'k=5)?')
     print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(['fs_name', 'n'])[
-        'optimization_time'].median().reset_index().pivot(index='n', columns='fs_name').round(3))
+        'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 
     print('\n---- Number of Alternatives ----')
 
@@ -527,11 +527,11 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
             normalization_func)  # applies function to each column independently
 
-        print(f'\nWhat is the median feature-set quality ({normalization_name}-normalized per',
+        print(f'\nWhat is the mean feature-set quality ({normalization_name}-normalized per',
               'experimental setting) for different iterations (alternatives) and feature-selection',
               'methods (for sequential search with k=5)?')
         for metric in plot_metrics:
-            print(norm_results.groupby(['n_alternative', 'fs_name'])[metric].median().reset_index(
+            print(norm_results.groupby(['n_alternative', 'fs_name'])[metric].mean().reset_index(
                 ).pivot(index='n_alternative', columns='fs_name').round(2))
 
         # Figures 6a-6d (arXiv version): Feature-set quality by number of alternatives and
@@ -543,7 +543,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(8, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='n_alternative', y='quality', hue='Metric', data=plot_results,
-                    palette='Set2', fliersize=1)
+                    palette='RdPu', fliersize=1)
         plt.xlabel('Number of alternative')
         plt.ylabel('Normalized Quality', y=0.37)   # moved a bit downwards to fit on plot
         plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
@@ -553,28 +553,27 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-num-alternatives-quality-{normalization_name}.pdf')
 
-        if (func_name == 'max') and (not fillna):
+        if func_name == 'max':
             for metric in ['train_objective', 'decision_tree_test_mcc']:
-                # Figures 7a, 7b (arXiv version): Feature-set quality by number of alternatives and
+                # Figures 7a-d (arXiv version): Feature-set quality by number of alternatives and
                 # feature-selection method
-                plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].median(
+                plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].mean(
                     ).reset_index()
                 plt.figure(figsize=(5, 5))
                 plt.rcParams['font.size'] = 18
                 sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
-                             data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                             data=plot_results, palette='RdPu', hue_order=fs_name_plot_order,
                              style_order=fs_name_plot_order)
                 plt.xlabel('Number of alternative')
                 plt.xticks(range(11))
                 plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-                plt.ylim(0.78, 1.02)
-                plt.yticks(np.arange(start=0.8, stop=1.05, step=0.05))
+                plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
                 plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
                            bbox_to_anchor=(-0.2, -0.1), framealpha=0, handletextpad=0.2)
                 plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
                 plt.tight_layout()
                 plt.savefig(plot_dir / ('afs-impact-num-alternatives-fs-method-' +
-                                        f'{metric.replace("_", "-")}-max.pdf'))
+                                        f'{metric.replace("_", "-")}-{normalization_name}.pdf'))
 
     print('\n-- Optimization status --')
 
@@ -613,11 +612,11 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
             normalization_func)  # applies function to each column independently
 
-        print(f'\nWhat is the median feature-set quality ({normalization_name}-normalized per',
+        print(f'\nWhat is the mean feature-set quality ({normalization_name}-normalized per',
               'experimental setting) for different dissimilarity thresholds "tau" and',
               'feature-selection methods (for sequential search with k=10)?')
         for metric in plot_metrics:
-            print(norm_results.groupby(['tau_abs', 'fs_name'])[metric].median().reset_index(
+            print(norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean().reset_index(
                 ).pivot(index='tau_abs', columns='fs_name').round(2))
 
         for metric in (['train_objective', 'test_objective'] if func_name == 'max'
@@ -647,17 +646,17 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
                                     f'{normalization_name}.pdf'))
 
-        if (func_name == 'max') and (not fillna):
+        if func_name == 'max':
             for metric in ['train_objective', 'decision_tree_test_mcc']:
-                # Figures 10a, 10b (arXiv version): Feature-set quality by dissimilarity threshold
+                # Figures 10a-d (arXiv version): Feature-set quality by dissimilarity threshold
                 # "tau" and feature-selection method
-                plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].median(
+                plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean(
                     ).reset_index()
                 plot_results['tau'] = plot_results['tau_abs'] / 10
                 plt.figure(figsize=(5, 5))
                 plt.rcParams['font.size'] = 18
                 sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
-                             data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                             data=plot_results, palette='RdPu', hue_order=fs_name_plot_order,
                              style_order=fs_name_plot_order)
                 plt.xlabel('$\\tau$')
                 plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
@@ -670,7 +669,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
                 plt.tight_layout()
                 plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
-                                        'max.pdf'))
+                                        f'{normalization_name}.pdf'))
 
     print('\n-- Optimization status --')
 
