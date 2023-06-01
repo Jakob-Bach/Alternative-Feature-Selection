@@ -30,12 +30,12 @@ plt.rcParams['figure.max_open_warning'] = 0
 # to the console.
 def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathlib.Path) -> None:
     if not results_dir.is_dir():
-        raise FileNotFoundError('Results directory does not exist.')
+        raise FileNotFoundError('The results directory does not exist.')
     if not plot_dir.is_dir():
-        print('Plot directory does not exist. We create it.')
+        print('The plot directory does not exist. We create it.')
         plot_dir.mkdir(parents=True)
     if any(plot_dir.glob('*.pdf')):
-        print('Plot directory is not empty. Files might be overwritten, but not deleted.')
+        print('The plot directory is not empty. Files might be overwritten but not deleted.')
 
     results = data_handling.load_results(directory=results_dir)
 
@@ -269,7 +269,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nWhat is the median standard deviation of feature-set quality within one search run',
           'for different feature-selection methods, search methods, and numbers of alternatives',
-          '(for k=5 and 0-5 alternatives)?')
+          '(for k=5 and 1-5 alternatives)?')
     for metric in plot_metrics:
         print(comparison_results.groupby(group_cols)[metric].std().reset_index().groupby(
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
@@ -297,7 +297,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nWhat is the median average value of feature-set quality within one search run for',
           'different feature-selection methods, search methods, and numbers of alternatives',
-          '(for k=5 and 0-5 alternatives)?')
+          '(for k=5 and 1-5 alternatives)?')
     for metric, ylim, min_tick in zip(
             plot_metrics, [(-0.05, 1.05), (-0.05, 0.65), (-0.3, 1.05)], [0, 0, -0.2]):
         print(comparison_results.groupby(group_cols)[metric].mean().reset_index().groupby(
@@ -342,7 +342,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nWhat is the median feature-set-quality difference per experimental setting between',
           'simultaneous search (summed-quality objective) and sequential search for different',
-          'feature-selection methods and numbers of alternatives (for k=5 and 0-5 alternatives)?')
+          'feature-selection methods and numbers of alternatives (for k=5 and 1-5 alternatives)?')
     plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index(
         ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
                 values='train_objective').reset_index()
@@ -395,13 +395,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results = plot_results[plot_results['fs_name'] != 'Greedy Wrapper']
 
     print('\nHow is the optimization status distributed for different feature-selection methods',
-          '(excluding Greedy Wrapper) and search methods (for k=5 and 0-5 alternatives)?')
+          '(excluding Greedy Wrapper) and search methods (for k=5 and 1-5 alternatives)?')
     print(plot_results.groupby(['fs_name', 'search_name'])['optimization_status'].value_counts(
         normalize=True).round(4).apply('{:.2%}'.format))
 
     # Table 3 (arXiv version)
     print('\n## Table: Optimization status by search method and feature-selection method (for k=5',
-          'and 0-5 alternatives) ##\n')
+          'and 1-5 alternatives) ##\n')
     print_results = (plot_results.groupby(['fs_name', 'search_name'])[
         'optimization_status'].value_counts(normalize=True) * 100).rename('Frequency').reset_index()
     print_results = print_results.pivot(index=['fs_name', 'search_name'], values='Frequency',
@@ -452,7 +452,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     ])
 
     print('\nHow is the optimization time distributed for different feature-selection methods',
-          '(for sequential search with k=5 and 0-5 alternatives)?')
+          '(for sequential search with k=5 and 1-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby('fs_name')[
         'optimization_time'].describe().round(3))
 
@@ -463,14 +463,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     # Table 5 (arXiv version)
     print('\n## Table: Mean optimization time by feature-selection method and search method',
-          '(for k=5 and 0-5 alternatives) ##\n')
+          '(for k=5 and 1-5 alternatives) ##\n')
     print_results = plot_results.groupby(['fs_name', 'search_name'])[
         'optimization_time'].mean().reset_index()
     print_results = print_results.pivot(index='fs_name', columns='search_name')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
     print('\nWhat is the mean optimization time for different feature-selection methods and',
-          'numbers of alternatives (for sequential search with k=5 and 0-5 alternatives)?')
+          'numbers of alternatives (for sequential search with k=5 and 1-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(
         ['fs_name', 'num_alternatives'])['optimization_time'].mean().reset_index().pivot(
             index='num_alternatives', columns='fs_name').round(3))
@@ -489,7 +489,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
     print('\nWhat is the mean optimization time for different feature-selection methods and',
-          'dataset dimensionalities "n" (for sequential search with k=5 and 0-5 alternatives)?')
+          'dataset dimensionalities "n" (for sequential search with k=5 and 1-5 alternatives)?')
     print(plot_results[plot_results['search_name'] == 'seq.'].groupby(['fs_name', 'n'])[
         'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 
@@ -735,6 +735,6 @@ if __name__ == '__main__':
                         dest='results_dir', help='Directory with experimental results.')
     parser.add_argument('-p', '--plots', type=pathlib.Path, default='data/plots/',
                         dest='plot_dir', help='Output directory for plots.')
-    print('Evaluation started.')
+    print('Evaluation started.\n')
     evaluate(**vars(parser.parse_args()))
     print('\nPlots created and saved.')
