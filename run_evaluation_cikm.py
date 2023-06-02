@@ -9,7 +9,6 @@ Usage: python -m run_evaluation_cikm --help
 
 import argparse
 import ast
-import itertools
 import pathlib
 
 import matplotlib.pyplot as plt
@@ -260,107 +259,95 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Feature-set quality --')
 
+    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
     # Here, we use k=10 instead of k=5 to show more distinct values of "tau" (10 instead of 5)
-    normalization_funcs = {'max': lambda x: x / x.max(),
-                           'min-max': lambda x: (x - x.min()) / (x.max() - x.min())}
-    seq_results = results[(results['search_name'] == 'seq.') & (results['k'] == 10)].copy()
-    metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+    norm_results = results.loc[(results['search_name'] == 'seq.') & (results['k'] == 10),
+                               group_cols + plot_metrics + ['n_alternative']].copy()
 
     # Shift [-1, 1] metrics to [0, 1] first, since (1) max-normalizing with a negative max changes
     # order, e.g., [-0.5, -0.6, ..., -1] becomes [1, 1.2, ..., 2] (lower numbers get higher and
     # maximum can exceed 1) and (2) filling NAs with 0 (which we do for some of the plots to account
     # for infeasibility) makes most sense if 0 is the theoretical minimum of the metric
-    condition = seq_results['fs_name'].isin(('mRMR', 'Greedy Wrapper'))
-    seq_results.loc[condition, ['train_objective', 'test_objective']] = (
-        seq_results.loc[condition, ['train_objective', 'test_objective']] + 1) / 2
-    seq_results['decision_tree_test_mcc'] = (seq_results['decision_tree_test_mcc'] + 1) / 2
+    condition = norm_results['fs_name'].isin(('mRMR', 'Greedy Wrapper'))
+    norm_results.loc[condition, ['train_objective', 'test_objective']] = (
+        norm_results.loc[condition, ['train_objective', 'test_objective']] + 1) / 2
+    norm_results['decision_tree_test_mcc'] = (norm_results['decision_tree_test_mcc'] + 1) / 2
 
-    for (func_name, normalization_func), fillna in itertools.product(
-            normalization_funcs.items(), (False, True)):
-        norm_results = seq_results[group_cols + metrics + ['n_alternative']].copy()
-        normalization_name = func_name
-        if fillna:  # after shifting performed above, all metrics have 0 as theoretical minimum
-            norm_results[metrics] = norm_results[metrics].fillna(0)
-            normalization_name += '-fillna'
-        norm_results[metrics] = norm_results.groupby(group_cols)[metrics].apply(
-            normalization_func)  # applies function to each column independently
+    norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)  # infeasible feature sets
+    norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
+        lambda x: x / x.max())  # applies function to each column independently
 
-        # Figures 2a, 2b, 2c: Feature-set quality by number of alternatives and dissimilarity
-        # threshold "tau"
-        plot_metrics = []
-        if fillna and (func_name == 'max'):
-            plot_metrics = ['train_objective', 'test_objective']
-        if fillna and (func_name == 'min-max'):
-            plot_metrics = ['decision_tree_test_mcc']
-        for metric in plot_metrics:
-            plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
-                ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
-            plot_results['tau'] = plot_results['tau_abs'] / 10
-            plt.figure(figsize=(5, 3))
-            plt.rcParams['font.size'] = 18
-            sns.lineplot(x='n_alternative', y=metric, hue='tau', data=plot_results, palette='RdPu',
-                         hue_norm=(-0.2, 1), legend=False)
-            # Use color scale instead of standard line plot legend; start color scaling at -0.2, so
-            # that the color for the actual lowest value (tau=0) is more readable (darker):
-            cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
-                cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
-            cbar.ax.invert_yaxis()  # put low values at top (like most lines are ordered)
-            cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
-            cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
-            plt.xlabel('Number of alternative')
-            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-            plt.xticks(range(0, 11, 1))
-            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-            plt.ylim(-0.05, 1.05)
-            plt.tight_layout()
-            plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
-                                    f'{normalization_name}.pdf'))
+    # Figures 2a, 2b, 2c: Feature-set quality by number of alternatives and dissimilarity
+    # threshold "tau"
+    for metric in plot_metrics:
+        plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
+            ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
+        plot_results['tau'] = plot_results['tau_abs'] / 10
+        plt.figure(figsize=(5, 3))
+        plt.rcParams['font.size'] = 18
+        sns.lineplot(x='n_alternative', y=metric, hue='tau', data=plot_results, palette='RdPu',
+                     hue_norm=(-0.2, 1), legend=False)
+        # Use color scale instead of standard line plot legend; start color scaling at -0.2, so
+        # that the color for the actual lowest value (tau=0) is more readable (darker):
+        cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
+            cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
+        cbar.ax.invert_yaxis()  # put low values at top (like most lines are ordered)
+        cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
+        cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
+        plt.xlabel('Number of alternative')
+        plt.ylabel(f'Normalized {metric_name_mapping[metric]}',
+                   y=(0.4 if metric == 'decision_tree_test_mcc' else 0.5))
+        plt.xticks(range(0, 11, 1))
+        plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+        plt.ylim(-0.05, 1.05)
+        plt.tight_layout()
+        plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}-max-' +
+                                'fillna.pdf'))
 
-        if fillna and (func_name == 'max'):
-            metric = 'train_objective'
+    print('\n-- Influence of feature-selection method --')
 
-            # Figure 3b: Feature-set quality by number of alternatives and feature-selection method
-            plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].mean(
-                ).reset_index()
-            plt.figure(figsize=(5, 5))
-            plt.rcParams['font.size'] = 18
-            sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
-                         data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
-                         style_order=fs_name_plot_order)
-            plt.xlabel('Number of alternative')
-            plt.xticks(range(11))
-            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-            plt.ylim(-0.05, 1.05)
-            plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
-                       bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
-            plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
-            plt.tight_layout()
-            plt.savefig(plot_dir / ('afs-impact-num-alternatives-fs-method-' +
-                                    f'{metric.replace("_", "-")}-{normalization_name}.pdf'))
+    metric = 'train_objective'
 
-            # Figure 3c: Feature-set quality by dissimilarity threshold "tau" and feature-selection
-            # method
-            plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean(
-                ).reset_index()
-            plot_results['tau'] = plot_results['tau_abs'] / 10
-            plt.figure(figsize=(5, 5))
-            plt.rcParams['font.size'] = 18
-            sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
-                         data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
-                         style_order=fs_name_plot_order)
-            plt.xlabel('$\\tau$')
-            plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
-            plt.xticks(np.arange(start=0.2, stop=1.1, step=0.1), minor=True)
-            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-            plt.ylim(-0.05, 1.05)
-            plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
-                       bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
-            plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
-            plt.tight_layout()
-            plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
-                                    f'{normalization_name}.pdf'))
+    # Figure 3b: Feature-set quality by number of alternatives and feature-selection method
+    plot_results = norm_results.groupby(['n_alternative', 'fs_name'])[metric].mean(
+        ).reset_index()
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 18
+    sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
+                 data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                 style_order=fs_name_plot_order)
+    plt.xlabel('Number of alternative')
+    plt.xticks(range(11))
+    plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+    plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+    plt.ylim(-0.05, 1.05)
+    plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
+               bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
+    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+    plt.tight_layout()
+    plt.savefig(plot_dir / (f'afs-impact-num-alternatives-fs-method-{metric.replace("_", "-")}-' +
+                            'max-fillna.pdf'))
+
+    # Figure 3c: Feature-set quality by dissimilarity threshold "tau" and feature-selection method
+    plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean(
+        ).reset_index()
+    plot_results['tau'] = plot_results['tau_abs'] / 10
+    plt.figure(figsize=(5, 5))
+    plt.rcParams['font.size'] = 18
+    sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
+                 data=plot_results, palette='Set2', hue_order=fs_name_plot_order,
+                 style_order=fs_name_plot_order)
+    plt.xlabel('$\\tau$')
+    plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
+    plt.xticks(np.arange(start=0.2, stop=1.1, step=0.1), minor=True)
+    plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+    plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+    plt.ylim(-0.05, 1.05)
+    plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
+               bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
+    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+    plt.tight_layout()
+    plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-max-fillna.pdf'))
 
     print('\n-- Optimization status --')
 
@@ -389,8 +376,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.ylim(-0.05, 1.05)
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-num-alternatives-tau-optimization-status.pdf')
-
-    print('\n-- Influence of feature-selection method --')
 
 
 # Parse some command-line arguments and run the main routine.
