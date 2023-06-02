@@ -123,9 +123,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
-    print('\nHow do the evaluation metrics (Spearman-)correlate (for all experimental settings)?')
-    print(results[['train_objective', 'test_objective', 'decision_tree_test_mcc']].corr(
-        method='spearman').round(2))
+    print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
+          'methods (for all experimental settings)?')
+    for fs_name in results['fs_name'].unique():
+        print('Feature-selection method:', fs_name)
+        plot_results = results.loc[results['fs_name'] == fs_name,
+                                   ['train_objective', 'test_objective', 'decision_tree_train_mcc',
+                                    'decision_tree_test_mcc']]
+        print(plot_results.rename(columns=(lambda x: x.replace('decision_tree_', ''))).corr(
+            method='spearman').round(2))
 
     print('\n-- Average value of feature-set quality --')
 

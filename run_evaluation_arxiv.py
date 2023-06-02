@@ -163,8 +163,23 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Correlation between evaluation metrics --')
 
+    print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
+          'methods (for all experimental settings)?')
+    plot_results = None  # correlation averaged over feature-selection methods
+    for fs_name in results['fs_name'].unique():
+        print('Feature-selection method:', fs_name)
+        print_results = results.loc[results['fs_name'] == fs_name, quality_metrics]
+        print_results = print_results.corr(method='spearman').round(2)
+        plot_results = print_results if (plot_results is None) else plot_results + print_results
+        print_results = print_results.drop(
+            index=['random_forest_train_mcc', 'random_forest_test_mcc'],
+            columns=['random_forest_train_mcc', 'random_forest_test_mcc'])
+        print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
+                                             index=(lambda x: x.replace('decision_', '')))
+        print(print_results)
+    plot_results = (plot_results / results['fs_name'].nunique())
+
     # Figure 2b (arXiv version): Correlation between evaluation metrics for feature-set quality
-    plot_results = results[quality_metrics].corr(method='spearman').round(2)
     plot_results.rename(columns=metric_name_mapping, index=metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 16
