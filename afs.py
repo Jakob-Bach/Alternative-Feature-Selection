@@ -145,10 +145,14 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
     # - "tau_abs": absolute number of differing features (only works for "dice")
     # - "d_name": name of set dissimilarity measure (currently supported: "dice", "jaccard")
+    # - "objective_agg": How to aggregate the feature sets' qualities in the objective. Parameter
+    #   only exists for consistency to simultaneous search but is irrelevant here (as we only find
+    #   one feature set per iteration, we do not need to aggregate over feature sets).
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
     def search_sequentially(self, k: int, num_alternatives: int, tau: Optional[float] = None,
-                            tau_abs: Optional[int] = None, d_name: str = 'dice') -> pd.DataFrame:
+                            tau_abs: Optional[int] = None, d_name: str = 'dice',
+                            objective_agg: str = 'sum') -> pd.DataFrame:
         results = []
         solver = AlternativeFeatureSelector.create_solver()
         s = [solver.BoolVar(name=f's_{j}') for j in range(self._n)]
