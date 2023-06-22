@@ -164,26 +164,28 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Correlation between evaluation metrics --')
 
     print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
-          'methods (for all experimental settings)?')
-    plot_results = None  # correlation averaged over feature-selection methods
-    for fs_name in results['fs_name'].unique():
-        print('Feature-selection method:', fs_name)
-        print_results = results.loc[results['fs_name'] == fs_name, quality_metrics]
-        print_results = print_results.corr(method='spearman').round(2)
-        plot_results = print_results if (plot_results is None) else plot_results + print_results
-        print_results = print_results.drop(
-            index=['random_forest_train_mcc', 'random_forest_test_mcc'],
-            columns=['random_forest_train_mcc', 'random_forest_test_mcc'])
-        print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
-                                             index=(lambda x: x.replace('decision_', '')))
-        print(print_results)
-    plot_results = (plot_results / results['fs_name'].nunique())
+          'methods (for all experimental settings; averaged over datasets and cross-validation',
+          'folds)?')
+    plot_results = results.groupby(['dataset_name', 'split_idx', 'fs_name'])[quality_metrics].corr(
+        method='spearman').reset_index().rename(columns={'level_3': 'metric'})
+    print_results = plot_results.groupby(['fs_name', 'metric'], sort=False)[quality_metrics].mean(
+        ).round(2).reset_index().set_index('metric')
+    print_results = print_results.drop(
+        index=['random_forest_train_mcc', 'random_forest_test_mcc'],
+        columns=['random_forest_train_mcc', 'random_forest_test_mcc'])
+    print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
+                                         index=(lambda x: x.replace('decision_', '')))
+    for fs_name in print_results['fs_name'].unique():
+        print(f'Correlation for feature-selection method "{fs_name}":')
+        print(print_results[print_results['fs_name'] == fs_name].drop(columns='fs_name'))
 
     # Figure 2b (arXiv version): Correlation between evaluation metrics for feature-set quality
+    plot_results = plot_results.groupby('Metric', sort=False)[quality_metrics].mean().round(2)
     plot_results.rename(columns=metric_name_mapping, index=metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 16
     sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
+    plt.ylabel(None)
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-evaluation-metrics-correlation.pdf')
 

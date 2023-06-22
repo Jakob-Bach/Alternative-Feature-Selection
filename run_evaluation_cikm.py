@@ -124,14 +124,20 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.savefig(plot_dir / f'afs-impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
     print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
-          'methods (for all experimental settings)?')
+          'methods (for all experimental settings; averaged over datasets and cross-validation',
+          'folds)?')
+    print_metrics = ['train_objective', 'test_objective', 'decision_tree_train_mcc',
+                     'decision_tree_test_mcc']
     for fs_name in results['fs_name'].unique():
         print('Feature-selection method:', fs_name)
-        plot_results = results.loc[results['fs_name'] == fs_name,
-                                   ['train_objective', 'test_objective', 'decision_tree_train_mcc',
-                                    'decision_tree_test_mcc']]
-        print(plot_results.rename(columns=(lambda x: x.replace('decision_tree_', ''))).corr(
-            method='spearman').round(2))
+        print_results = results[results['fs_name'] == fs_name]
+        print_results = print_results.groupby(['dataset_name', 'split_idx'])[print_metrics].corr(
+            method='spearman').reset_index().rename(columns={'level_2': 'metric'})
+        print_results = print_results.groupby('metric', sort=False)[print_metrics].mean(
+            ).round(2).reset_index().set_index('metric')
+        print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
+                                             index=(lambda x: x.replace('decision_', '')))
+        print(print_results)
 
     print('\n-- Average value of feature-set quality --')
 
