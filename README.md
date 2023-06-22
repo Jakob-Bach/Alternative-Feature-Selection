@@ -20,7 +20,7 @@ This document describes the repo structure, a short demo, and the steps to repro
 
 ## Repo Structure and Developer Info
 
-Currently, the repository contains six Python files and four non-code files.
+Currently, the repository contains seven Python files and four non-code files.
 The non-code files are:
 
 - `.gitignore`: For Python development.
@@ -28,7 +28,7 @@ The non-code files are:
 - `README.md`: You are here :upside_down_face:
 - `requirements.txt`: To set up an environment with all necessary dependencies; see below for details.
 
-Four of the code files are directly related to our experiments (see below for details):
+Five of the code files are directly related to our experiments (see below for details):
 
 - `prepare_datasets.py`: First stage of the experiments
   (download prediction datasets).
@@ -45,7 +45,7 @@ only these two files might be relevant for you:
 - `afs.py`: Classes for alternative feature selection.
   `AlternativeFeatureSelector` is the abstract superclass.
   It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
-  two search procedures, i.e., sequential as well as simultaneous (summed-quality and min-quality).
+  two search procedures, i.e., sequential as well as simultaneous (sum-aggregation and min-aggregation).
   To integrate a new feature-selection method, you need to create a subclass.
   The subclass needs to define the optimization problem of the feature-selection method
   (the objective function and maybe constraints) in `initialize_solver()` and
@@ -80,9 +80,9 @@ Running alternative feature selection only requires three steps:
     - `tau_abs` determines by how many features the feature sets should differ.
       You can also provide a relative value (from the interval `[0,1]`) via `tau`,
       and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
-    - `objective_agg` switches between the min-quality objective and the summed-quality objective in
-      a simultaneous search. Has no effect in sequential search (which only returns one feature set,
-      so there is no need to aggregate feature-set quality over feature sets).
+    - `objective_agg` switches between min-aggregation and sum-aggregation in simultaneous search.
+      Has no effect in sequential search (which only returns one feature set, so there is no need to
+      aggregate feature-set quality over feature sets).
 
 ```python
 import afs
