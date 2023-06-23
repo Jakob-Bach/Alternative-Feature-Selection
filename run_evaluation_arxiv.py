@@ -167,9 +167,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'methods (for all experimental settings; averaged over datasets and cross-validation',
           'folds)?')
     plot_results = results.groupby(['dataset_name', 'split_idx', 'fs_name'])[quality_metrics].corr(
-        method='spearman').reset_index().rename(columns={'level_3': 'metric'})
-    print_results = plot_results.groupby(['fs_name', 'metric'], sort=False)[quality_metrics].mean(
-        ).round(2).reset_index().set_index('metric')
+        method='spearman').reset_index().rename(columns={'level_3': 'Metric'})
+    print_results = plot_results.groupby(['fs_name', 'Metric'], sort=False)[quality_metrics].mean(
+        ).round(2).reset_index().set_index('Metric')
     print_results = print_results.drop(
         index=['random_forest_train_mcc', 'random_forest_test_mcc'],
         columns=['random_forest_train_mcc', 'random_forest_test_mcc'])

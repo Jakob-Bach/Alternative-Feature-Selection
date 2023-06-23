@@ -132,9 +132,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         print('Feature-selection method:', fs_name)
         print_results = results[results['fs_name'] == fs_name]
         print_results = print_results.groupby(['dataset_name', 'split_idx'])[print_metrics].corr(
-            method='spearman').reset_index().rename(columns={'level_2': 'metric'})
-        print_results = print_results.groupby('metric', sort=False)[print_metrics].mean(
-            ).round(2).reset_index().set_index('metric')
+            method='spearman').reset_index().rename(columns={'level_2': 'Metric'})
+        print_results = print_results.groupby('Metric', sort=False)[print_metrics].mean(
+            ).round(2).reset_index().set_index('Metric')
         print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
                                              index=(lambda x: x.replace('decision_', '')))
         print(print_results)
