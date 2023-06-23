@@ -24,7 +24,7 @@ import prediction
 
 # Different components of the experimental design, excluding the names of the search methods for
 # alternatives (hard-coded below) and prediction models (queried from the module "prediction").
-N_FOLDS = 10  # cross-validation for search and predictions
+N_FOLDS = 5  # cross-validation for search and predictions
 FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.GreedyWrapperSelector, afs.MISelector,
                           afs.ModelImportanceSelector, afs.MRMRSelector]
 K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
