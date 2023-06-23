@@ -584,8 +584,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         raise ValueError('Unknown objective aggregation.')
 
     # Run a greedy hill-climbing procedure to select features. In particular, start with a feature
-    # set satisfying all constraints and systematically try flipping the selection decisions of
-    # individual features. Continue with a new solution if it has higher quality than the currently
+    # set satisfying all constraints and systematically try flipping the current selection decisions
+    # of two features. Continue with a new solution if it has higher quality than the currently
     # best one. Use a prediction model to evaluate qualities of the feature sets. Stop after a fixed
     # number of iterations (= solver calls) or if no new valid feature set can be generated.
     # See the superclass for a description of the parameters and the return value.
@@ -606,15 +606,19 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
             Q_train_list = [prediction.evaluate_wrapper(
                 model=self._prediction_model, X=self._X_train.iloc[:, s_value], y=self._y_train)
                 for s_value in s_value_list]
-            j = 0  # other than pseudo-code in paper, 0-indexing here
+            j_1 = 0  # other than pseudo-code in paper, 0-indexing here
+            j_2 = j_1 + 1
             swap_variables = []
-            while (iters < self._max_iters) and (j < self._n):
+            while (iters < self._max_iters) and (j_1 < self._n - 1):
                 # We can't add temporary constraints (no remove function), but we can fix variables
                 for s, s_value in zip(s_list, s_value_list):  # fix s_j to inverse of previous value
-                    s[j].SetBounds(1 - s_value[j], 1 - s_value[j])
-                    swap_variables.append(s[j])
+                    s[j_1].SetBounds(1 - s_value[j_1], 1 - s_value[j_1])
+                    swap_variables.append(s[j_1])
+                    s[j_2].SetBounds(1 - s_value[j_2], 1 - s_value[j_2])
+                    swap_variables.append(s[j_2])
                 optimization_status = solver.Solve()
                 iters = iters + 1
+                restart_indexing = False
                 if optimization_status in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
                     current_s_value_list = [[bool(s_j.solution_value()) for s_j in s]
                                             for s in s_list]
@@ -625,11 +629,16 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                                                    new_Q_list=current_Q_train_list):
                         s_value_list = current_s_value_list
                         Q_train_list = current_Q_train_list
-                        j = 0  # re-start swapping with first feature (zero indexing!)
-                    else:
-                        j = j + 1
+                        restart_indexing = True
+                if restart_indexing:
+                    j_1 = 0  # re-start swapping with first feature (zero indexing!) ...
+                    j_2 = j_1 + 1  # ... and second feature
                 else:
-                    j = j + 1
+                    if j_2 < self._n - 1:  # "inner loop": only increase index of second feature
+                        j_2 = j_2 + 1
+                    else:  # "outer loop": increase index of first feature and reset second
+                        j_1 = j_1 + 1
+                        j_2 = j_1 + 1
                 for s_j in swap_variables:
                     s_j.SetBounds(0, 1)  # revert fixing to one value (make regular binary again)
                 swap_variables.clear()  # next iteration will swap at different position
