@@ -5,7 +5,6 @@ This repository contains the code of two papers:
 > Bach, Jakob, and Klemens Böhm. "Alternative Feature Selection with User Control"
 
 (Currently under review at CIKM 2023.
-Use the tag `run-2022-05-13` for reproducing results since the code has evolved a bit afterwards.
 In case the paper is accepted and published, we'll link it here.
 We'll link the experimental data, too.)
 

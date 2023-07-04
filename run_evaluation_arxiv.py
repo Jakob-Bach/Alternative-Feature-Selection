@@ -56,6 +56,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     search_name_plot_order = ['sim. (min)', 'sim. (sum)', 'seq.']
     results['optimization_status'].replace({0: 'Optimal', 1: 'Feasible', 2: 'Infeasible',
                                             6: 'Not solved'}, inplace=True)
+    status_order = ['Infeasible', 'Not solved', 'Feasible', 'Optimal']
     # Define columns for main experimental dimensions (corresponding to independent search runs):
     group_cols = ['dataset_name', 'split_idx', 'fs_name', 'search_name', 'k', 'tau_abs',
                   'num_alternatives']
@@ -423,9 +424,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         'optimization_status'].value_counts(normalize=True) * 100).rename('Frequency').reset_index()
     print_results = print_results.pivot(index=['fs_name', 'search_name'], values='Frequency',
                                         columns='optimization_status').fillna(0).reset_index()
-    status_order = ['Infeasible', 'Not solved', 'Feasible', 'Optimal']
-    print_results = print_results[print_results.columns[:2].tolist() + status_order]  # re-order
-    print(print_results.style.format('{:.2f}\\%'.format, subset=status_order).hide(
+    col_order = [x for x in status_order if x in print_results.columns]  # some might not occur
+    print_results = print_results[print_results.columns[:2].tolist() + col_order]  # re-order
+    print(print_results.style.format('{:.2f}\\%'.format, subset=col_order).hide(
         axis='index').to_latex(hrules=True))
 
     print('\nHow is the optimization status distributed for different numbers of alternatives',
@@ -445,8 +446,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         normalize=True) * 100).rename('Frequency').reset_index()
     print_results = print_results.pivot(index='num_alternatives', values='Frequency',
                                         columns='optimization_status').fillna(0).reset_index()
-    print_results = print_results[[print_results.columns[0]] + status_order]  # re-order
-    print(print_results.style.format('{:.2f}\\%'.format, subset=status_order).hide(
+    print_results = print_results[[print_results.columns[0]] + col_order]  # re-order
+    print(print_results.style.format('{:.2f}\\%'.format, subset=col_order).hide(
         axis='index').to_latex(hrules=True))
 
     print('\n-- Optimization time --')
