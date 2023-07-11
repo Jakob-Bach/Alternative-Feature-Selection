@@ -351,6 +351,31 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
         return results
 
 
+class ManualQualityUnivariateSelector(LinearQualityFeatureSelector):
+    """Feature Selection with Manually-Defined Univariate Qualities
+
+    Univariate feature selector where the qualities are directly provided rather than computing them
+    from a dataset. Useful to try examples for a theoretical analysis of the univariate objective.
+    White-box optimization approach.
+    """
+
+    # Set the features' univariate qualities for the objective. If "q_test" is not provided, the
+    # training-set qualities are used for the test set as well. Note that we use different
+    # parameters for this method here than in other classes (where a dataset is passed).
+    def set_data(self, q_train: Sequence[float], q_test: Optional[Sequence[float]] = None) -> None:
+        if q_test is None:
+            q_test = q_train
+        assert len(q_train) == len(q_test), 'Train and test need same number of features.'
+        self._q_train = q_train
+        self._q_test = q_test
+        self._n = len(q_train)
+
+    # This super-class method is irrelevant for the current class. We only provide it to make it
+    # non-abstract, but it should not be used (a bit dubious from the software-design perspective).
+    def compute_qualities(self, X: pd.DataFrame, y: pd.Series) -> Iterable[float]:
+        raise TypeError('Qualities are directly set in set_data(), computation unnecessary.')
+
+
 class MISelector(LinearQualityFeatureSelector):
     """Feature Selection with Mutual Information
 
