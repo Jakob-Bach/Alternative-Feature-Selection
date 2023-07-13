@@ -8,12 +8,12 @@ This repository contains the code of two papers:
 In case the paper is accepted and published, we'll link it here.
 We'll link the experimental data, too.)
 
-> Bach, Jakob. "Finding Optimal Diverse Feature Sets via Alternative Feature Selection"
+> Bach, Jakob. "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
 
 (To be submitted to arXiv.
-Currently, there is no dedicated tag since the coding is in progress.
-Once the paper is published, we'll link it here.
-We'll link the experimental data, too.)
+Once the paper is published, we'll link it here.)
+You can find the corresponding complete experimental data (inputs as well as results) on [RADAR4KIT](https://doi.org/10.35097/1623).
+Use the tags `run-2023-06-23` and `evaluation-2023-07-04` for reproducing the experiments.
 
 This document describes the repo structure, a short demo, and the steps to reproduce the experiments.
 
