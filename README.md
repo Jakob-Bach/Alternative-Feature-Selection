@@ -72,8 +72,9 @@ Running alternative feature selection only requires three steps:
     - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
 3) Run the search for alternatives:
     - Method name (`search_sequentially()` / `search_simultaneously()`) determines whether
-      a sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s (MI, FCBF, and
-      model-based importance) also support the heuristic procedure `search_greedy_replacement()`.
+      a sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s (like "MI" and
+      model-based importance) also support the heuristic procedures `search_greedy_replacement()`
+      and `search_greedy_balancing()`, which are described in the Appendix of the arXiv paper.
     - `k` determines the number of features to be selected.
     - `num_alternatives` determines ... you can guess what.
     - `tau_abs` determines by how many features the feature sets should differ.
@@ -118,6 +119,18 @@ The optimization statuses are:
 - 1: `Feasible` (a valid solution found till timeout, but may not be optimal)
 - 2: `Infeasible` (there is no valid solution)
 - 6: `Not solved` (no valid solution found till timeout, but there may be one)
+
+If you don't want to provide a dataset but use manually defined univariate qualities
+(which result in the same optimization problem as "MI" and model importance), you can do so as well:
+
+```python
+import afs
+
+feature_selector = afs.ManualQualityUnivariateSelector()
+feature_selector.set_data(q_train=[1, 2, 3, 7, 8, 9])
+search_result = selector.search_sequentially(k=3, num_alternatives=3, tau_abs=2)
+print(search_result.drop(columns='optimization_time').round(2))
+```
 
 ## Setup
 

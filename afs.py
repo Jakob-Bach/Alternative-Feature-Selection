@@ -300,9 +300,10 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
         return ([solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_train, s)]) for s in s_list],
                 [solver.Sum([q_j * s_j for (q_j, s_j) in zip(self._q_test, s)]) for s in s_list])
 
-    # Greedy-replacement search for alternative feature sets. Optimal for univariate feature
-    # qualities (objective: sum of qualities over features and feature sets) as long a there are
-    # unused features. Works without a solver. Tailored to the Dice dissimilarity.
+    # Greedy-replacement search for alternative feature sets with univariate qualities. Selects the
+    # top "(1 - tau) * k" features in each alternative and sequentially replaces the remaining
+    # features from alternative to alternative, iterating over features by decreasing quality.
+    # Works without a solver. Only supports the Dice dissimilarity, no other dissimilarities.
     # - "k": number of features to select
     # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
@@ -313,42 +314,93 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                                   tau_abs: Optional[int] = None) -> pd.DataFrame:
         if tau is not None:
             tau_abs = math.ceil(tau * k)
-        if k > self._n:  # not enough features for selection
-            return pd.DataFrame()
-        results = []
+        s_list = []
         indices = np.argsort(self._q_train)[::-1]  # descending order by qualities
         s = [0] * self._n  # initial selection for all alternatives
-        position = 0  # index of index of currently selected feature
-        while position < k - tau_abs:
-            j = indices[position]
+        feature_position = 0  # index of index of currently selected feature
+        while feature_position < k - tau_abs:  # "(1-tau) * k" features are same in all alternatives
+            j = indices[feature_position]
             s[j] = 1
-            position = position + 1
+            feature_position = feature_position + 1
         i = 0  # number of current alternative
         while i <= num_alternatives and i <= ((self._n - k) / tau_abs):
             s_i = s.copy()  # select best "k - tau_abs" features
             for _ in range(tau_abs):  # select remaining "tau_abs" features
-                j = indices[position]
+                j = indices[feature_position]
                 s_i[j] = 1
-                position = position + 1
-            results.append(s_i)
+                feature_position = feature_position + 1
+            s_list.append(s_i)
             i = i + 1
         # Transform into a result structure consistent to the other searches in the top-level class:
         results = [{
             'selected_idxs': [j for (j, s_j) in enumerate(s) if s_j],
             'train_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_train, s)),
             'test_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s)),
-            'optimization_status': pywraplp.Solver.OPTIMAL
-        } for s in results]
+            'optimization_status': pywraplp.Solver.FEASIBLE  # heuristic -> potentially suboptimal
+        } for s in s_list]
         for i in range(i, num_alternatives + 1):  # in case algorithm ran out of features early
             results.append({
                 'selected_idxs': [],
                 'train_objective': float('nan'),
                 'test_objective': float('nan'),
-                'optimization_status': pywraplp.Solver.NOT_SOLVED  # not necessarily infeasible
+                'optimization_status': pywraplp.Solver.NOT_SOLVED  # heuristic -> solution may exist
             })
         results = pd.DataFrame(results)
         results['optimization_time'] = float('nan')  # not worth to measure it
         return results
+
+    # Greedy-balancing search for alternative feature sets with univariate qualities. Selects the
+    # top "(1 - tau) * k" features in each alternative and employs a Longest-Processing-Time-first
+    # (LPT) heuristic for the remaining features (i.e., sort features decreasingly by quality and
+    # always add to the alternative with the currently lowest quality), thereby conducting a
+    # (heuristic) simultaneous search.
+    # Works without a solver. Only supports the Dice dissimilarity, no other dissimilarities.
+    # - "k": number of features to select
+    # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
+    # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
+    # - "tau_abs": absolute number of differing features
+    # Return a table of results ("selected_idx", "train_objective", "test_objective",
+    # "optimization_time", "optimization_status").
+    def search_greedy_balancing(self, k: int, num_alternatives: int, tau: Optional[float] = None,
+                                tau_abs: Optional[int] = None) -> pd.DataFrame:
+        if tau is not None:
+            tau_abs = math.ceil(tau * k)
+        if tau_abs * num_alternatives + k > self._n:  # not enough features for alternatives
+            return pd.DataFrame([{
+                'selected_idxs': [],
+                'train_objective': float('nan'),
+                'test_objective': float('nan'),
+                'optimization_status': pywraplp.Solver.NOT_SOLVED,  # heuristic ->solution may exist
+                'optimization_time': float('nan')
+            }] * (num_alternatives + 1))  # all alternatives in table/list identical (NA values)
+        s_list = [[0] * self._n for _ in range(num_alternatives + 1)]  # initial selection
+        indices = np.argsort(self._q_train)[::-1]  # descending order by qualities
+        feature_position = 0  # index of index of currently selected feature
+        while feature_position < k - tau_abs:  # "(1-tau) * k" features are same in all alternatives
+            j = indices[feature_position]
+            for i in range(num_alternatives + 1):
+                s_list[i][j] = 1
+            feature_position = feature_position + 1
+        Q_list = [0] * (num_alternatives + 1)  # same (relative) quality of all sets (same features)
+        while feature_position < tau_abs * num_alternatives + k:  # LPT heuristic for the rest
+            Q_min = float('inf')
+            i_min = -1
+            for i in range(num_alternatives + 1):  # find lowest-quality set with space remaining
+                if (Q_list[i] < Q_min) and (sum(s_list[i]) < k):
+                    Q_min = Q_list[i]
+                    i_min = i
+            j = indices[feature_position]
+            s_list[i_min][j] = 1
+            Q_list[i_min] = Q_list[i_min] + self._q_train[j]
+            feature_position = feature_position + 1
+        # Transform into a result structure consistent to the other searches in the top-level class:
+        return pd.DataFrame([{
+            'selected_idxs': [j for (j, s_j) in enumerate(s) if s_j],
+            'train_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_train, s)),
+            'test_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s)),
+            'optimization_status': pywraplp.Solver.FEASIBLE,  # heuristic -> potentially suboptimal
+            'optimization_time': float('nan')  # not worth to measure it
+        } for s in s_list])
 
 
 class ManualQualityUnivariateSelector(LinearQualityFeatureSelector):
