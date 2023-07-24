@@ -10,8 +10,8 @@ We'll link the experimental data, too.)
 
 > Bach, Jakob. "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
 
-(To be submitted to arXiv.
-Once the paper is published, we'll link it here.)
+published on [*arXiv*](https://arxiv.org/).
+You can find the paper [here](https://doi.org/10.48550/arXiv.2307.11607).
 You can find the corresponding complete experimental data (inputs as well as results) on [RADAR4KIT](https://doi.org/10.35097/1623).
 Use the tags `run-2023-06-23` and `evaluation-2023-07-04` for reproducing the experiments.
 
