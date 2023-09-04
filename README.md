@@ -4,7 +4,7 @@ This repository contains the code of two papers:
 
 > Bach, Jakob, and Klemens Böhm. "Alternative Feature Selection with User Control"
 
-(Currently under review at CIKM 2023.
+(Currently under review at a journal.
 In case the paper is accepted and published, we'll link it here.
 We'll link the experimental data, too.)
 
@@ -33,7 +33,7 @@ Five of the code files are directly related to our experiments (see below for de
   (download prediction datasets).
 - `run_experiments.py`: Second stage of the experiments
   (run feature selection, search for alternatives, and make predictions).
-- `run_evaluation_(arxiv|cikm).py`: Third stage of the experiments
+- `run_evaluation_(arxiv|journal).py`: Third stage of the experiments
   (compute statistics and create plots for the paper).
 - `data_handling.py`: Functions for working with prediction datasets and experimental data.
 
@@ -248,11 +248,11 @@ python -m run_evaluation_arxiv
 or
 
 ```bash
-python -m run_evaluation_cikm
+python -m run_evaluation_journal
 ```
 
-(The conference version, due to its limited length, contains less evaluations.
-Also, the plots are formatted differently.)
+(The journal version is more focused and therefore contains less evaluations.
+Also, the plots are formatted a bit differently.)
 
 All scripts have a few command-line options, which you can see by running the scripts like
 

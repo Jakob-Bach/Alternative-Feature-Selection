@@ -1,9 +1,9 @@
 """Run evaluation
 
-Script to compute summary statistics and create plots for the CIKM version of the paper. Should be
-run after the experimental pipeline, as this script requires the pipeline's outputs as inputs.
+Script to compute summary statistics and create plots for the journal version of the paper. Should
+be run after the experimental pipeline, as this script requires the pipeline's outputs as inputs.
 
-Usage: python -m run_evaluation_cikm --help
+Usage: python -m run_evaluation_journal --help
 """
 
 
