@@ -80,6 +80,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     print(dataset_overview[['n_instances', 'n_features']].describe().round().astype(int))
 
+    # Table 1
+    print('\n## Table: Dataset overview ##\n')
+    dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
+    dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
+    dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': 'm',
+                                     'n_features': 'n'}, inplace=True)
+    dataset_overview.sort_values(by='Dataset', key=lambda x: x.str.lower(), inplace=True)
+    print(dataset_overview.style.format(escape='latex').hide(axis='index').to_latex(hrules=True))
+
     print('\n-------- Evaluation --------')
 
     print('\n------ Search Methods for Alternatives ------')
@@ -198,7 +207,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     ])
     plot_results = plot_results[plot_results['fs_name'] != 'Greedy Wrapper']
 
-    # Table 1
+    # Table 2
     print('\n## Table: Optimization status by search method and feature-selection method (for k=5',
           'and 1-5 alternatives) ##\n')
     print_results = (plot_results.groupby(['fs_name', 'search_name'])[
@@ -237,7 +246,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         ]
     ])
 
-    # Table 2
+    # Table 3
     print('\n## Table: Mean optimization time by feature-selection method and search method',
           '(for k=5 and 1-5 alternatives) ##\n')
     print_results = plot_results.groupby(['fs_name', 'search_name'])[
