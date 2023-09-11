@@ -71,6 +71,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n---- Alternatives (Constraints) ----')
 
+    print('\n-- Timeout --')
+
     print('\nHow is the optimization status distributed (for all experimental settings)?')
     print(results['optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
 
@@ -131,22 +133,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figtext(x=0.14, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-stddev-{metric.replace("_", "-")}.pdf')
-
-    print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
-          'methods (for all experimental settings; averaged over datasets and cross-validation',
-          'folds)?')
-    print_metrics = ['train_objective', 'test_objective', 'decision_tree_train_mcc',
-                     'decision_tree_test_mcc']
-    for fs_name in results['fs_name'].unique():
-        print('Feature-selection method:', fs_name)
-        print_results = results[results['fs_name'] == fs_name]
-        print_results = print_results.groupby(['dataset_name', 'split_idx'])[print_metrics].corr(
-            method='spearman').reset_index().rename(columns={'level_2': 'Metric'})
-        print_results = print_results.groupby('Metric', sort=False)[print_metrics].mean(
-            ).round(2).reset_index().set_index('Metric')
-        print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
-                                             index=(lambda x: x.replace('decision_', '')))
-        print(print_results)
 
     print('\n-- Average value of feature-set quality --')
 
@@ -329,6 +315,22 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}' +
                                     f'-{normalization_name}.pdf'))
 
+    print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
+          'methods (for all experimental settings; averaged over datasets and cross-validation',
+          'folds)?')
+    print_metrics = ['train_objective', 'test_objective', 'decision_tree_train_mcc',
+                     'decision_tree_test_mcc']
+    for fs_name in results['fs_name'].unique():
+        print('Feature-selection method:', fs_name)
+        print_results = results[results['fs_name'] == fs_name]
+        print_results = print_results.groupby(['dataset_name', 'split_idx'])[print_metrics].corr(
+            method='spearman').reset_index().rename(columns={'level_2': 'Metric'})
+        print_results = print_results.groupby('Metric', sort=False)[print_metrics].mean(
+            ).round(2).reset_index().set_index('Metric')
+        print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
+                                             index=(lambda x: x.replace('decision_', '')))
+        print(print_results)
+
     print('\n-- Influence of feature-selection method --')
 
     metric = 'train_objective'
@@ -385,7 +387,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results = plot_results.groupby(['tau_abs', 'n_alternative'])[
         'optimization_status'].agg(lambda x: (x == 'Optimal').sum() / len(x)).reset_index()
     plot_results['tau'] = plot_results['tau_abs'] / 10
-    plt.figure(figsize=(5, 3))
+    plt.figure(figsize=(5, 2.5))
     plt.rcParams['font.size'] = 14
     sns.lineplot(x='n_alternative', y='optimization_status', hue='tau', data=plot_results,
                  palette='RdPu', hue_norm=(-0.2, 1), legend=False)
