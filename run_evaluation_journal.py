@@ -10,11 +10,13 @@ Usage: python -m run_evaluation_journal --help
 import argparse
 import ast
 import pathlib
+import warnings
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
 import pandas as pd
+import scipy.stats
 import seaborn as sns
 
 import data_handling
@@ -271,10 +273,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
 
+    print('\nHow do the evaluation metrics (Spearman-)correlate with dataset dimensionality "n"',
+          'for each alternative and dissimilarity threshold (for sequential search with k=10 and',
+          'MI as feature-selection method)?')  # also plots created, but that's what's printed
+
     for fillna in (False, True):
         # Here, we use k=10 instead of k=5 to show more distinct values of "tau" (10 instead of 5)
         norm_results = results.loc[(results['search_name'] == 'seq.') & (results['k'] == 10),
-                                   group_cols + plot_metrics + ['n_alternative']].copy()
+                                   group_cols + plot_metrics + ['n', 'n_alternative']].copy()
         # Shift [-1, 1] metrics to [0, 1] first, since (1) normalizing with a negative max changes
         # order, e.g., [-0.5, -0.6, ..., -1] becomes [1, 1.2, ..., 2] (lower numbers get higher and
         # maximum can exceed 1) and (2) filling NAs with 0 (which we do for some of the plots to
@@ -317,6 +323,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.tight_layout()
             plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}' +
                                     f'-{normalization_name}.pdf'))
+
+            print('\nEvaluation metric:', metric, '| fill NAs:', fillna)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(action='ignore',
+                                        category=scipy.stats.SpearmanRConstantInputWarning)
+                print(norm_results[norm_results['fs_name'] == 'MI'].groupby(
+                    ['n_alternative', 'tau_abs']).apply(lambda x: x[metric].corr(
+                        x['n'], method='spearman')).rename('').reset_index().pivot(
+                            index='tau_abs', columns='n_alternative').round(2))
 
     print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
           'methods (for all experimental settings; averaged over datasets and cross-validation',
