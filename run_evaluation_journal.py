@@ -86,10 +86,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n## Table: Dataset overview ##\n')
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
-    dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': 'm',
-                                     'n_features': 'n'}, inplace=True)
+    dataset_overview['Mean corr.'] = dataset_overview['dataset'].apply(
+        lambda x: data_handling.mean_feature_corr(dataset_name=x, directory=data_dir)).round(2)
+    dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': '$m$',
+                                     'n_features': '$n$'}, inplace=True)
     dataset_overview.sort_values(by='Dataset', key=lambda x: x.str.lower(), inplace=True)
-    print(dataset_overview.style.format(escape='latex').hide(axis='index').to_latex(hrules=True))
+    print(dataset_overview.style.format(escape='latex', precision=2).hide(axis='index').to_latex(
+        hrules=True))
 
     print('\n-------- Evaluation --------')
 
@@ -288,7 +291,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
             lambda x: x / x.max())  # applies function to each column independently
 
-        # Figures 3a-3d: Feature-set quality by number of alternatives and dissimilarity
+        # Figures 3a-3f: Feature-set quality by number of alternatives and dissimilarity
         # threshold "tau"
         for metric in plot_metrics:
             plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(

@@ -7,6 +7,7 @@ Functions for data I/O in the experimental pipeline (prediction datasets and exp
 import pathlib
 from typing import Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
 
 
@@ -21,6 +22,14 @@ def load_dataset(dataset_name: str, directory: pathlib.Path) -> Tuple[pd.DataFra
 def save_dataset(X: pd.DataFrame, y: pd.Series, dataset_name: str, directory: pathlib.Path) -> None:
     X.to_csv(directory / (dataset_name + '_X.csv'), index=False)
     y.to_csv(directory / (dataset_name + '_y.csv'), index=False)
+
+
+# Compute average absolute rank correlation of features in a dataset, excluding
+# (1) the self-correlation, which always is one, and (2) NaNs caused by constant features
+def mean_feature_corr(dataset_name: str, directory: pathlib.Path) -> float:
+    X, _ = load_dataset(dataset_name=dataset_name, directory=directory)
+    corr_matrix = X.corr(method='spearman').abs()
+    return np.nanmean(corr_matrix.values[np.triu_indices_from(corr_matrix.values, k=1)])
 
 
 # List dataset names based on target-values_files.
