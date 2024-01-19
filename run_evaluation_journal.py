@@ -63,7 +63,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # Define columns for evaluation metrics:
     metric_name_mapping = {'train_objective': '$Q_{\\mathrm{train}}$',
                            'test_objective': '$Q_{\\mathrm{test}}$',
-                           'decision_tree_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$'}
+                           'decision_tree_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$',
+                           'knn_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{kNN}}$'}
     # Number the alternatives (however, they only have a natural order in sequential search)
     results['n_alternative'] = results.groupby(group_cols).cumcount()
 
@@ -116,7 +117,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\nWhat is the median standard deviation of feature-set quality within one search run',
           'for different feature-selection methods, search methods, and numbers of alternatives',
           '(for k=5 and 1-5 alternatives)?')
-    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
+    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc', 'knn_test_mcc']:
         print(comparison_results.groupby(group_cols)[metric].std().reset_index().groupby(
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
@@ -144,7 +145,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\nWhat is the median average value of feature-set quality within one search run for',
           'different feature-selection methods, search methods, and numbers of alternatives',
           '(for k=5 and 1-5 alternatives)?')
-    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
+    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc', 'knn_test_mcc']:
         print(comparison_results.groupby(group_cols)[metric].mean().reset_index().groupby(
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
@@ -271,7 +272,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Feature-set quality --')
 
-    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
+    plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc', 'knn_test_mcc']
 
     print('\nHow do the evaluation metrics (Spearman-)correlate with dataset dimensionality "n"',
           'for each alternative and dissimilarity threshold (for sequential search with k=10 and',
@@ -289,6 +290,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         norm_results.loc[condition, ['train_objective', 'test_objective']] = (
             norm_results.loc[condition, ['train_objective', 'test_objective']] + 1) / 2
         norm_results['decision_tree_test_mcc'] = (norm_results['decision_tree_test_mcc'] + 1) / 2
+        norm_results['knn_test_mcc'] = (norm_results['knn_test_mcc'] + 1) / 2
         if fillna:  # replace quality of infeasible feature sets with 0
             norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
             normalization_name = 'max-fillna'
@@ -316,7 +318,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
             plt.xlabel('Number of alternative')
             plt.ylabel(f'Normalized {metric_name_mapping[metric]}',
-                       y=(0.45 if metric == 'decision_tree_test_mcc' else 0.5))
+                       y=(0.45 if 'mcc' in metric else 0.5))
             plt.xticks(range(0, 11, 1))
             plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
             plt.ylim(-0.05, 1.05)
@@ -337,7 +339,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'methods (for all experimental settings; averaged over datasets and cross-validation',
           'folds)?')
     print_metrics = ['train_objective', 'test_objective', 'decision_tree_train_mcc',
-                     'decision_tree_test_mcc']
+                     'decision_tree_test_mcc', 'knn_test_mcc']
     for fs_name in results['fs_name'].unique():
         print('Feature-selection method:', fs_name)
         print_results = results[results['fs_name'] == fs_name]
