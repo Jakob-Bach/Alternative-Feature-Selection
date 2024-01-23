@@ -318,6 +318,7 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                                   objective_agg: Optional[str] = None) -> pd.DataFrame:
         if tau is not None:
             tau_abs = math.ceil(tau * k)
+        start_time = time.process_time()
         s_list = []
         indices = np.argsort(self._q_train)[::-1]  # descending order by qualities
         s = [0] * self._n  # initial selection for all alternatives
@@ -335,6 +336,7 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                 feature_position = feature_position + 1
             s_list.append(s_i)
             i = i + 1
+        end_time = time.process_time()  # result-preparation time also not measured in exact search
         # Transform into a result structure consistent to the other searches in the top-level class:
         results = [{
             'selected_idxs': [j for (j, s_j) in enumerate(s) if s_j],
@@ -350,7 +352,7 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                 'optimization_status': pywraplp.Solver.NOT_SOLVED  # heuristic -> solution may exist
             })
         results = pd.DataFrame(results)
-        results['optimization_time'] = float('nan')  # not worth to measure it
+        results['optimization_time'] = end_time - start_time
         return results
 
     # Greedy-balancing search for alternative feature sets with univariate qualities. Selects the
@@ -379,8 +381,9 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
                 'train_objective': float('nan'),
                 'test_objective': float('nan'),
                 'optimization_status': pywraplp.Solver.NOT_SOLVED,  # heuristic ->solution may exist
-                'optimization_time': float('nan')
+                'optimization_time': 0  # not worth to measure it
             }] * (num_alternatives + 1))  # all alternatives in table/list identical (NA values)
+        start_time = time.process_time()
         s_list = [[0] * self._n for _ in range(num_alternatives + 1)]  # initial selection
         indices = np.argsort(self._q_train)[::-1]  # descending order by qualities
         feature_position = 0  # index of index of currently selected feature
@@ -401,13 +404,14 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
             s_list[i_min][j] = 1
             Q_list[i_min] = Q_list[i_min] + self._q_train[j]
             feature_position = feature_position + 1
+        end_time = time.process_time()  # result-preparation time also not measured in exact search
         # Transform into a result structure consistent to the other searches in the top-level class:
         return pd.DataFrame([{
             'selected_idxs': [j for (j, s_j) in enumerate(s) if s_j],
             'train_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_train, s)),
             'test_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s)),
             'optimization_status': pywraplp.Solver.FEASIBLE,  # heuristic -> potentially suboptimal
-            'optimization_time': float('nan')  # not worth to measure it
+            'optimization_time': end_time - start_time
         } for s in s_list])
 
 
