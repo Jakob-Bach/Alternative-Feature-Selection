@@ -110,6 +110,17 @@ def evaluate_feature_selector(
                     feature_selector=feature_selector, afs_search_func_name='search_simultaneously',
                     k=k, tau_abs=tau_abs, num_alternatives=num_alternatives,
                     objective_agg=objective_agg))
+            # For univariate filter feature-selection, also evaluate heuristics:
+            if feature_selector_type in (afs.MISelector, afs.ModelImportanceSelector):
+                results.append(evaluate_one_search(
+                    feature_selector=feature_selector,
+                    afs_search_func_name='search_greedy_replacement',
+                    k=k, tau_abs=tau_abs, num_alternatives=NUM_ALTERNATIVES_SEQUENTIAL))
+                for num_alternatives in NUM_ALTERNATIVES_SIMULTANEOUS_VALUES:
+                    results.append(evaluate_one_search(
+                        feature_selector=feature_selector,
+                        afs_search_func_name='search_greedy_balancing',
+                        k=k, tau_abs=tau_abs, num_alternatives=num_alternatives))
     results = pd.concat(results, ignore_index=True)
     results['fs_name'] = feature_selector_type.__name__
     results['dataset_name'] = dataset_name
