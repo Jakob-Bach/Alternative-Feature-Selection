@@ -152,7 +152,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     # "optimization_time", "optimization_status").
     def search_sequentially(self, k: int, num_alternatives: int, tau: Optional[float] = None,
                             tau_abs: Optional[int] = None, d_name: str = 'dice',
-                            objective_agg: str = 'sum') -> pd.DataFrame:
+                            objective_agg: Optional[str] = None) -> pd.DataFrame:
         results = []
         solver = AlternativeFeatureSelector.create_solver()
         s = [solver.BoolVar(name=f's_{j}') for j in range(self._n)]
@@ -308,10 +308,14 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
     # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
     # - "tau_abs": absolute number of differing features
+    # - "objective_agg": How to aggregate the feature sets' qualities in the objective. Parameter
+    #   only exists for consistency to exact simultaneous search but is irrelevant here (as we only
+    #   find one feature set per iteration, we do not need to aggregate over feature sets).
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
-    def search_greedy_replacement(self, k: int, num_alternatives: int, tau: Optional[float] = None,
-                                  tau_abs: Optional[int] = None) -> pd.DataFrame:
+    def search_greedy_replacement(self, k: int, num_alternatives: int,
+                                  tau: Optional[float] = None, tau_abs: Optional[int] = None,
+                                  objective_agg: Optional[str] = None) -> pd.DataFrame:
         if tau is not None:
             tau_abs = math.ceil(tau * k)
         s_list = []
@@ -359,10 +363,14 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
     # - "num_alternatives": number of returned feature sets - 1 (first set is considered "original")
     # - "tau": relative (i.e., in [0,1]) dissimilarity threshold for being alternative
     # - "tau_abs": absolute number of differing features
+    # - "objective_agg": How to aggregate the feature sets' qualities in the objective. Parameter
+    #   only exists for consistency to exact simultaneous search but is irrelevant here (as we
+    #   always employ a min-aggregation-like policy to compose alternatives).
     # Return a table of results ("selected_idx", "train_objective", "test_objective",
     # "optimization_time", "optimization_status").
-    def search_greedy_balancing(self, k: int, num_alternatives: int, tau: Optional[float] = None,
-                                tau_abs: Optional[int] = None) -> pd.DataFrame:
+    def search_greedy_balancing(self, k: int, num_alternatives: int,
+                                tau: Optional[float] = None, tau_abs: Optional[int] = None,
+                                objective_agg: Optional[str] = None) -> pd.DataFrame:
         if tau is not None:
             tau_abs = math.ceil(tau * k)
         if tau_abs * num_alternatives + k > self._n:  # not enough features for alternatives
