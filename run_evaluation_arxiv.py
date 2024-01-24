@@ -11,11 +11,13 @@ import argparse
 import ast
 import itertools
 import pathlib
+import warnings
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
 import pandas as pd
+import scipy.stats
 import seaborn as sns
 
 import data_handling
@@ -86,11 +88,16 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n## Table: Dataset overview ##\n')
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
-    dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': 'm',
-                                     'n_features': 'n'}, inplace=True)
+    dataset_overview['Mean corr.'] = dataset_overview['dataset'].apply(
+        lambda x: data_handling.mean_feature_corr(dataset_name=x, directory=data_dir)).round(2)
+    dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': '$m$',
+                                     'n_features': '$n$'}, inplace=True)
     dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('GAMETES', 'G')
+    dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('_Epistasis', 'E')
+    dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('_Heterogeneity', 'H')
     dataset_overview.sort_values(by='Dataset', key=lambda x: x.str.lower(), inplace=True)
-    print(dataset_overview.style.format(escape='latex').hide(axis='index').to_latex(hrules=True))
+    print(dataset_overview.style.format(escape='latex', precision=2).hide(axis='index').to_latex(
+        hrules=True))
 
     print('\n-------- Appendix --------')
 
@@ -624,7 +631,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     for (func_name, normalization_func), fillna in itertools.product(
             normalization_funcs.items(), (False, True)):
-        norm_results = seq_results[group_cols + plot_metrics + ['n_alternative']].copy()
+        norm_results = seq_results[group_cols + plot_metrics + ['n', 'n_alternative']].copy()
         normalization_name = func_name
         if fillna:  # after shifting performed above, all metrics have 0 as theoretical minimum
             norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
@@ -638,6 +645,20 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         for metric in plot_metrics:
             print(norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean().reset_index(
                 ).pivot(index='tau_abs', columns='fs_name').round(2))
+
+        print(f'\nHow does the feature-set quality ({normalization_name}-normalized per',
+              'experimental setting) (Spearman-)correlate with dataset dimensionality "n" for ',
+              'each alternative and dissimilarity treshold "tau" (for sequential search with k=10',
+              'and MI as feature-selection method)?')
+        for metric in plot_metrics:
+            with warnings.catch_warnings():
+                warnings.filterwarnings(action='ignore',
+                                        category=scipy.stats.SpearmanRConstantInputWarning)
+                print('Metric:', metric)
+                print(norm_results[norm_results['fs_name'] == 'MI'].groupby(
+                    ['n_alternative', 'tau_abs']).apply(lambda x: x[metric].corr(
+                        x['n'], method='spearman')).rename('').reset_index().pivot(
+                            index='tau_abs', columns='n_alternative').round(2))
 
         for metric in (['train_objective', 'test_objective'] if func_name == 'max'
                        else ['decision_tree_test_mcc']):
