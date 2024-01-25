@@ -165,9 +165,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 palette='RdPu', fliersize=1, hue_order=fs_name_plot_order)
     plt.ylim(-0.55, 1.35)
     plt.yticks(np.arange(start=-0.4, stop=1.3, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+    plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-evaluation-metrics-overfitting.pdf')
 
@@ -219,9 +219,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.xlabel('Feature-set size $k$')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.25, -0.1),
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.07, y=0.12, s='Selection', rotation='vertical')
+    plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-fs-method-k-decision-tree-test-mcc.pdf')
 
@@ -265,9 +265,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.65, 0.65)
     plt.yticks(np.arange(start=-0.6, stop=0.7, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+    plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-fs-method-k-metric-diff.pdf')
 
@@ -314,9 +314,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
         plt.ylim(-0.05, 0.35)
-        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
                    columnspacing=1, framealpha=0, ncols=2)
-        plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
+        plt.figtext(x=0.06, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-stddev-{metric.replace("_", "-")}.pdf')
 
@@ -343,9 +343,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
         plt.ylim(ylim)
         plt.yticks(np.arange(start=min_tick, stop=ylim[1], step=0.2))
-        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+        plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
                    columnspacing=1, framealpha=0, ncols=2)
-        plt.figtext(x=0.08, y=0.13, s='Search', rotation='vertical')
+        plt.figtext(x=0.06, y=0.13, s='Search', rotation='vertical')
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-mean-{metric.replace("_", "-")}.pdf')
 
@@ -361,9 +361,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.xticks(rotation=10, horizontalalignment='right')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.15),
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.15),
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.07, y=0.14, s='Selection', rotation='vertical')
+    plt.figtext(x=0.06, y=0.13, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-search-fs-method-decision-tree-test-mcc.pdf')
 
@@ -396,9 +396,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.ylabel('Difference sim. vs. seq.')
     plt.ylim(-0.35, 0.35)
     plt.yticks(np.arange(start=-0.3, stop=0.4, step=0.1))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.2, -0.1),
+    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
                columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+    plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
     plt.tight_layout()
     plt.savefig(plot_dir / 'afs-impact-search-fs-method-metric-diff.pdf')
 
@@ -596,8 +596,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
                 plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
                 plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
-                           bbox_to_anchor=(-0.2, -0.1), framealpha=0, handletextpad=0.2)
-                plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+                           bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
+                plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
                 plt.tight_layout()
                 plt.savefig(plot_dir / ('afs-impact-num-alternatives-fs-method-' +
                                         f'{metric.replace("_", "-")}-{normalization_name}.pdf'))
@@ -704,7 +704,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.ylim(-0.05, 1.05)
             plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
                        bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
-            plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+            plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
             plt.tight_layout()
             plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
                                     f'{normalization_name}.pdf'))
