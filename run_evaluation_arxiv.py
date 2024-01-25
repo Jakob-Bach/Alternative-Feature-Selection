@@ -629,15 +629,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         seq_results.loc[condition, ['train_objective', 'test_objective']] + 1) / 2
     seq_results['decision_tree_test_mcc'] = (seq_results['decision_tree_test_mcc'] + 1) / 2
 
-    for (func_name, normalization_func), fillna in itertools.product(
-            normalization_funcs.items(), (False, True)):
+    for fillna in (False, True):
         norm_results = seq_results[group_cols + plot_metrics + ['n', 'n_alternative']].copy()
-        normalization_name = func_name
         if fillna:  # after shifting performed above, all metrics have 0 as theoretical minimum
             norm_results[plot_metrics] = norm_results[plot_metrics].fillna(0)
-            normalization_name += '-fillna'
+            normalization_name = 'max-fillna'
+        else:
+            normalization_name = 'max'
         norm_results[plot_metrics] = norm_results.groupby(group_cols)[plot_metrics].apply(
-            normalization_func)  # applies function to each column independently
+            normalization_funcs['max'])  # applies function to each column independently
 
         print(f'\nWhat is the mean feature-set quality ({normalization_name}-normalized per',
               'experimental setting) for different dissimilarity thresholds "tau" and',
@@ -660,8 +660,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                         x['n'], method='spearman')).rename('').reset_index().pivot(
                             index='tau_abs', columns='n_alternative').round(2))
 
-        for metric in (['train_objective', 'test_objective'] if func_name == 'max'
-                       else ['decision_tree_test_mcc']):
             # Figures 5a-5f (arXiv version): Feature-set quality by number of alternatives and
             # dissimilarity threshold "tau"
             plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
@@ -687,30 +685,29 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.savefig(plot_dir / (f'afs-impact-num-alternatives-tau-{metric.replace("_", "-")}-' +
                                     f'{normalization_name}.pdf'))
 
-        if func_name == 'max':
-            for metric in ['train_objective', 'decision_tree_test_mcc']:
-                # Figures 7a-7d (arXiv version): Feature-set quality by dissimilarity threshold
-                # "tau" and feature-selection method
-                plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean(
-                    ).reset_index()
-                plot_results['tau'] = plot_results['tau_abs'] / 10
-                plt.figure(figsize=(5, 5))
-                plt.rcParams['font.size'] = 18
-                sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
-                             data=plot_results, palette='RdPu', hue_order=fs_name_plot_order,
-                             style_order=fs_name_plot_order)
-                plt.xlabel('$\\tau$')
-                plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
-                plt.xticks(np.arange(start=0.2, stop=1.1, step=0.1), minor=True)
-                plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
-                plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-                plt.ylim(-0.05, 1.05)
-                plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
-                           bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
-                plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
-                plt.tight_layout()
-                plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
-                                        f'{normalization_name}.pdf'))
+        for metric in ['train_objective', 'decision_tree_test_mcc']:
+            # Figures 7a-7d (arXiv version): Feature-set quality by dissimilarity threshold
+            # "tau" and feature-selection method
+            plot_results = norm_results.groupby(['tau_abs', 'fs_name'])[metric].mean(
+                ).reset_index()
+            plot_results['tau'] = plot_results['tau_abs'] / 10
+            plt.figure(figsize=(5, 5))
+            plt.rcParams['font.size'] = 18
+            sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
+                         data=plot_results, palette='RdPu', hue_order=fs_name_plot_order,
+                         style_order=fs_name_plot_order)
+            plt.xlabel('$\\tau$')
+            plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
+            plt.xticks(np.arange(start=0.2, stop=1.1, step=0.1), minor=True)
+            plt.ylabel(f'Normalized {metric_name_mapping[metric]}')
+            plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
+            plt.ylim(-0.05, 1.05)
+            plt.legend(title=' ', edgecolor='white', loc='upper left', columnspacing=1, ncols=2,
+                       bbox_to_anchor=(-0.15, -0.1), framealpha=0, handletextpad=0.2)
+            plt.figtext(x=0.06, y=0.12, s='Selection', rotation='vertical')
+            plt.tight_layout()
+            plt.savefig(plot_dir / (f'afs-impact-tau-fs-method-{metric.replace("_", "-")}-' +
+                                    f'{normalization_name}.pdf'))
 
     print('\n-- Optimization status --')
 
