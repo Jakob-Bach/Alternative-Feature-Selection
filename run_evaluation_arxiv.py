@@ -56,8 +56,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     results.loc[results['search_name'] == 'sim.', 'search_name'] = (
         'sim. (' + results.loc[results['search_name'] == 'sim.', 'objective_agg'] + ')')
     results.drop(columns='objective_agg', inplace=True)
-    search_name_plot_order = ['sim. (min)', 'sim. (sum)', 'seq.']
-    search_name_heuristics_plot_order = ['sim. (sum)', 'sim. (min)', 'bal.', 'seq.', 'rep.']
+    search_name_hue_order_solver = ['sim. (min)', 'sim. (sum)', 'seq.']
+    search_name_hue_order_all = ['sim. (sum)', 'sim. (min)', 'bal.', 'seq.', 'rep.']
     results['optimization_status'].replace({0: 'Optimal', 1: 'Feasible', 2: 'Infeasible',
                                             6: 'Not solved'}, inplace=True)
     status_order = ['Infeasible', 'Not solved', 'Feasible', 'Optimal']
@@ -81,8 +81,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n---- Alternatives (Constraints) ----')
 
-    print('\nHow is the optimization status distributed (for all experimental settings)?')
-    print(results['optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
+    print('\nHow is the optimization status distributed (for solver-based search)?')
+    print(results.loc[results['search_name'].isin(search_name_hue_order_solver),
+                      'optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
 
     print('\n------ Datasets ------')
 
@@ -105,20 +106,22 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n------ Evaluation ------')
 
+    solver_results = results[results['search_name'].isin(search_name_hue_order_solver)]
+
     print('\n---- Datasets ----')
 
-    print('\nHow is the mean feature-set quality per dataset distributed (for all experimental',
-          'settings)?')
-    print(results.groupby('dataset_name')[['train_objective', 'decision_tree_test_mcc']].mean(
-        ).describe().round(2))
+    print('\nHow is the mean feature-set quality per dataset distributed (for solver-based search)?')
+    print(solver_results.groupby('dataset_name')[
+        ['train_objective', 'decision_tree_test_mcc']].mean().describe().round(2))
 
-    print('\nHow does the feature set-quality (Spearman-)correlate with dataset dimensionality "n"',
-          '(for all experimental settings)?')
-    print(results[quality_metrics].corrwith(results['n'], method='spearman').round(2))
+    print('\nHow does the feature set-quality (Spearman-)correlate with dataset dimensionality',
+          '"n" (for solver-based search)?')
+    print(solver_results[quality_metrics].corrwith(results['n'], method='spearman').round(2))
 
     print('\nHow does the feature set-quality (Spearman-)correlate with relative feature-set size',
-          '"k/n" (for all experimental settings)?')
-    print(results[quality_metrics].corrwith(results['k'] / results['n'], method='spearman').round(2))
+          '"k/n" (for solver-based search)?')
+    print(solver_results[quality_metrics].corrwith(results['k'] / results['n'],
+                                                   method='spearman').round(2))
 
     # Figure 10: Feature-set quality by feature-set size "k" and dataset size "n"
     plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
@@ -146,8 +149,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Prediction models and overfitting --')
 
     print('\nHow is the prediction performance distributed for different prediction models (for',
-          'all experimental settings)?')
-    print(results[[x for x in results.columns if '_mcc' in x]].describe().round(2).transpose())
+          'solver-based search)?')
+    print(solver_results[[x for x in solver_results.columns if '_mcc' in x]].describe(
+        ).round(2).transpose())
 
     # Figure 11a: Difference in feature-set quality between training set and test set by evaluation
     # metric and feature-selection method
@@ -156,7 +160,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         '$MCC^{\\mathrm{tree}}$': ('decision_tree_train_mcc', 'decision_tree_test_mcc'),
         '$MCC^{\\mathrm{forest}}$': ('random_forest_train_mcc', 'random_forest_test_mcc')
     }
-    plot_results = results[['fs_name'] + quality_metrics].copy()
+    plot_results = solver_results[['fs_name'] + quality_metrics].copy()
     for metric, metric_pair in metric_pairs.items():
         plot_results[metric] = plot_results[metric_pair[0]] - plot_results[metric_pair[1]]
     plot_results = plot_results.melt(id_vars='fs_name', value_vars=list(metric_pairs.keys()),
@@ -176,10 +180,10 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Correlation between evaluation metrics --')
 
     print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
-          'methods (for all experimental settings; averaged over datasets and cross-validation',
-          'folds)?')
-    plot_results = results.groupby(['dataset_name', 'split_idx', 'fs_name'])[quality_metrics].corr(
-        method='spearman').reset_index().rename(columns={'level_3': 'Metric'})
+          'methods (for solver-based search; averaged over datasets and cross-validation folds)?')
+    plot_results = solver_results.groupby(['dataset_name', 'split_idx', 'fs_name'])[
+        quality_metrics].corr(method='spearman').reset_index().rename(
+            columns={'level_3': 'Metric'})
     print_results = plot_results.groupby(['fs_name', 'Metric'], sort=False)[quality_metrics].mean(
         ).round(2).reset_index().set_index('Metric')
     print_results = print_results.drop(
@@ -236,8 +240,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(results['wrapper_iters'].describe().round(2))
 
     print('\nHow is the optimization status distributed for different feature-selection methods',
-          '(for all experimental settings)?')
-    print(pd.crosstab(results['optimization_status'], results['fs_name'],
+          '(for solver-based search)?')
+    print(pd.crosstab(solver_results['optimization_status'], solver_results['fs_name'],
                       normalize='columns').applymap('{:.2%}'.format))
 
     print('\nHow is the optimization status distributed for different feature-selection methods',
@@ -311,7 +315,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='RdPu', fliersize=1, hue_order=search_name_plot_order)
+                    palette='RdPu', fliersize=1, hue_order=search_name_hue_order_solver)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
@@ -339,7 +343,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='RdPu', fliersize=1, hue_order=search_name_plot_order)
+                    palette='RdPu', fliersize=1, hue_order=search_name_hue_order_solver)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
         plt.ylim(ylim)
@@ -779,7 +783,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.figure(figsize=(8, 3))
             plt.rcParams['font.size'] = 15
             sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                        palette='RdPu', fliersize=1, hue_order=search_name_heuristics_plot_order)
+                        palette='RdPu', fliersize=1, hue_order=search_name_hue_order_all)
             plt.xlabel('Number of alternatives $a$')
             plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
             plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
@@ -916,7 +920,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Optimization time --')
 
     print('\nWhat is the maximum optimization time for different search methods for alternatives',
-          'and feature-selection methods (for all experimental settings)?')
+          '(including heuristics) and feature-selection methods (for all experimental settings)?')
     print(results[results['fs_name'].isin(['MI', 'Model Gain'])].groupby(
         ['search_name', 'fs_name'])['optimization_time'].max().reset_index().pivot(
             index='search_name', columns='fs_name'))
@@ -932,6 +936,6 @@ if __name__ == '__main__':
                         dest='results_dir', help='Directory with experimental results.')
     parser.add_argument('-p', '--plots', type=pathlib.Path, default='data/plots/',
                         dest='plot_dir', help='Output directory for plots.')
-    print('Evaluation started.\n')
+    print('Evaluation started.')
     evaluate(**vars(parser.parse_args()))
     print('\nPlots created and saved.')
