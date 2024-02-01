@@ -409,21 +409,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Optimization status --')
 
-    # While sequential search has one optimization status per feature set (as the latter are found
-    # separately), simultaneous search has same status for multiple feature sets; to not bias
-    # analysis towards higher humber of alternatives, we only extract one status per sim. search
-    assert ((comparison_results[comparison_results['search_name'].str.startswith(
-        'sim')].groupby(group_cols)['optimization_status'].nunique() == 1).all())
-    plot_results = pd.concat([
-        comparison_results.loc[
-            comparison_results['search_name'] == 'seq.',
-            ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
-        ],
-        comparison_results[comparison_results['search_name'].str.startswith('sim')].groupby(
-            group_cols).first().reset_index()[
-                ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
-        ]
-    ])
+    # To not bias analysis regarding the humber of alternatives (simultaneous-search results
+    # duplicate optimization statuses within search runs, sequential-search results with higher
+    # "a" always contains results from lower "a" as well), we only extract one status for each
+    # dataset, cross-validation fold, feature-selection method, search method, "a", and "tau"
+    plot_results = comparison_results.loc[
+        comparison_results['num_alternatives'] == comparison_results['n_alternative'],
+        ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
+    ]
+    assert plot_results['search_name'].value_counts().nunique() == 1
     plot_results = plot_results[plot_results['fs_name'] != 'Greedy Wrapper']
 
     print('\nHow is the optimization status distributed for different feature-selection methods',
@@ -877,19 +871,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Optimization status --')
 
-    # While sequential search has one optimization status per feature set (as the latter are found
-    # separately), simultaneous search has same status for multiple feature sets; to not bias
-    # analysis towards higher humber of alternatives, we only extract one status per sim. search
-    plot_results = pd.concat([
-        comparison_results.loc[
-            comparison_results['search_name'].isin(['seq.', 'rep.']),
-            ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
-        ],
-        comparison_results[comparison_results['search_name'].isin(
-            ['sim. (min)', 'sim. (sum)', 'bal.'])].groupby(group_cols).first().reset_index()[
-                ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
-        ]
-    ]).reset_index(drop=True)
+    # To not bias analysis regarding the humber of alternatives (simultaneous-search results
+    # duplicate optimization statuses within search runs, sequential-search results with higher
+    # "a" always contains results from lower "a" as well), we only extract one status for each
+    # dataset, cross-validation fold, feature-selection method, search method, "a", and "tau"
+    plot_results = comparison_results.loc[
+        comparison_results['num_alternatives'] == comparison_results['n_alternative'],
+        ['fs_name', 'search_name', 'num_alternatives', 'optimization_status']
+    ]
+    assert plot_results['search_name'].value_counts().nunique() == 1
 
     print('\nHow is the optimization status distributed for different feature-selection methods',
           'and search methods (including heuristics) (for k=5 and 1-5 alternatives)?')
