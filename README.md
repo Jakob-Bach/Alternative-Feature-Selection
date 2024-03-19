@@ -2,12 +2,12 @@
 
 This repository contains the code of two papers:
 
-> Bach, Jakob, and Klemens Böhm. "Alternative Feature Selection with User Control"
+> Bach, Jakob, and Klemens Böhm. "Alternative feature selection with user control"
 
-is currently under review at a journal.
-In case the paper is accepted and published, we'll link it here.
-We'll link the experimental data, too.
-Use the tags `run-2023-06-23` and `evaluation-2023-09-11` for reproducing the experiments.
+is published in the [International Journal of Data Science and Analytics](https://link.springer.com/journal/41060).
+You can find the paper [here](https://doi.org/10.1007/s41060-024-00527-8).
+You can find the corresponding complete experimental data (inputs as well as results) on *RADAR4KIT*.
+Use the tags `run-2023-06-23` and `evaluation-2024-03-19` for reproducing the experiments.
 
 > Bach, Jakob. "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
 
