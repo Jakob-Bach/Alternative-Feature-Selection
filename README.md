@@ -6,7 +6,7 @@ This repository contains the code of two papers:
 
 is published in the [International Journal of Data Science and Analytics](https://link.springer.com/journal/41060).
 You can find the paper [here](https://doi.org/10.1007/s41060-024-00527-8).
-You can find the corresponding complete experimental data (inputs as well as results) on *RADAR4KIT*.
+You can find the corresponding complete experimental data (inputs as well as results) on [*RADAR4KIT*](https://doi.org/10.35097/1975).
 Use the tags `run-2023-06-23` and `evaluation-2024-03-19` for reproducing the experiments.
 
 > Bach, Jakob. "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
