@@ -15,11 +15,14 @@ import pathlib
 from typing import Any, Dict, Optional, Sequence, Type
 
 import pandas as pd
+import sklearn.base
+import sklearn.ensemble
+import sklearn.metrics
+import sklearn.tree
 import tqdm
 
 import afs
 import data_handling
-import prediction
 
 
 # Different components of the experimental design, excluding the names of the search methods for
@@ -31,6 +34,13 @@ K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
 NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search (also yields all intermediate solutions)
 NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
 OBJECTIVE_AGG_SIMULTANEOUS_VALUES = ['min', 'sum']
+
+MODELS = [
+    {'name': 'decision_tree', 'func': sklearn.tree.DecisionTreeClassifier,
+     'args': {'criterion': 'entropy', 'random_state': 25}},
+    {'name': 'random_forest', 'func': sklearn.ensemble.RandomForestClassifier,
+     'args': {'n_estimators': 100, 'criterion': 'entropy', 'random_state': 25}}
+]  # prediction models trained with the feature sets
 
 
 # Define experimental settings as cross-product of datasets (from "data_dir"), cross-validation
@@ -52,6 +62,22 @@ def define_experimental_settings(data_dir: pathlib.Path,
     return experimental_settings
 
 
+# Train and evaluate a prediction model on a train-test-splitted dataset (where features were
+# selected). Return a dictionary with prediction performances.
+def evaluate_prediction_performance(
+        model: sklearn.base.BaseEstimator, X_train: pd.DataFrame, y_train: pd.Series,
+        X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, float]:
+    if len(X_train.columns) == 0:  # no features selected (no valid solution found)
+        return {'train_mcc': float('nan'), 'test_mcc': float('nan')}
+    model.fit(X=X_train, y=y_train)
+    pred_train = model.predict(X=X_train)
+    pred_test = model.predict(X=X_test)
+    result = {}
+    result['train_mcc'] = sklearn.metrics.matthews_corrcoef(y_true=y_train, y_pred=pred_train)
+    result['test_mcc'] = sklearn.metrics.matthews_corrcoef(y_true=y_test, y_pred=pred_test)
+    return result
+
+
 # Evaluate one search for alternatives for one feature selection method (on one split of a dataset).
 # In particular, call the "afs_search_func_name" on the "feature_selector", considering the
 # parameters "k", "tau_abs", "num_alternatives", and "objective_agg".
@@ -64,9 +90,9 @@ def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_se
     afs_search_func = getattr(feature_selector, afs_search_func_name)
     result = afs_search_func(k=k, tau_abs=tau_abs, num_alternatives=num_alternatives,
                              objective_agg=objective_agg)
-    for model_dict in prediction.MODELS:  # train each model with all feature sets found
+    for model_dict in MODELS:  # train each model with all feature sets found
         model = model_dict['func'](**model_dict['args'])
-        prediction_performances = [prediction.train_and_evaluate(
+        prediction_performances = [evaluate_prediction_performance(
             model=model, X_train=X_train.iloc[:, selected_idxs], y_train=y_train,
             X_test=X_test.iloc[:, selected_idxs], y_test=y_test)
             for selected_idxs in result['selected_idxs']]
@@ -96,7 +122,9 @@ def evaluate_feature_selector(
     results = []
     X, y = data_handling.load_dataset(dataset_name=dataset_name, directory=data_dir)
     feature_selector = feature_selector_type()
-    train_idx, test_idx = list(prediction.split_for_pipeline(X=X, y=y, n_splits=N_FOLDS))[split_idx]
+    splitter = sklearn.model_selection.StratifiedKFold(n_splits=N_FOLDS, shuffle=True,
+                                                       random_state=25)
+    train_idx, test_idx = list(splitter.split(X=X, y=y))[split_idx]
     feature_selector.set_data(X_train=X.iloc[train_idx], X_test=X.iloc[test_idx],
                               y_train=y.iloc[train_idx], y_test=y.iloc[test_idx])
     for k in K_VALUES:

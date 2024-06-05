@@ -21,7 +21,7 @@ This document describes the repo structure, a short demo, and the steps to repro
 
 ## Repo Structure and Developer Info
 
-Currently, the repository contains seven Python files and four non-code files.
+Currently, the repository contains six Python files and four non-code files.
 The non-code files are:
 
 - `.gitignore`: For Python development.
@@ -39,30 +39,26 @@ Five of the code files are directly related to our experiments (see below for de
   (compute statistics and create plots for the paper).
 - `data_handling.py`: Functions for working with prediction datasets and experimental data.
 
-Two of the code files contain classes and functions for alternative feature selection.
+In contrast, `afs.py` contains classes and functions for alternative feature selection.
 If you want to use, modify, or extend alternative feature selection,
-only these two files might be relevant for you:
-
-- `afs.py`: Classes for alternative feature selection.
-  `AlternativeFeatureSelector` is the abstract superclass.
-  It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
-  two search procedures, i.e., sequential as well as simultaneous (sum-aggregation and min-aggregation).
-  To integrate a new feature-selection method, you need to create a subclass.
-  The subclass needs to define the optimization problem of the feature-selection method
-  (the objective function and maybe constraints) in `initialize_solver()` and
-  the process of solving the optimization problem in `select_and_evaluate()`.
-  The search procedures for alternatives implemented in `AlternativeFeatureSelector` basically add
-  further constraints (for alternatives) to the optimization problem and call the solving routine.
-  We did this subclassing for the five feature-selection methods in our experiments, i.e.,
-  mutual information (univariate filter), FCBF, model-based importance, mRMR, and greedy wrapper.
-  There are further abstract superclasses extracting commonalities between feature selectors.
-  In particular, `WhiteBoxFeatureSelector` is a good starting point if you want to optimize your
-  objective with a solver (rather than only using the solver to check constraints while optimizing
-  a black-box objective separately).
-  `LinearQualityFeatureSelector` defines an objective that sums up the quality of individual
-  features, so your subclass only has to define how to compute these qualities.
-- `prediction.py`: Functions to make predictions for the experimental pipeline
-  and two of our feature-selection methods that use prediction models (model importance and wrapper).
+only this file might be relevant for you.
+`AlternativeFeatureSelector` is the abstract superclass.
+It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
+two search procedures, i.e., sequential as well as simultaneous (sum-aggregation and min-aggregation).
+To integrate a new feature-selection method, you need to create a subclass.
+The subclass needs to define the optimization problem of the feature-selection method
+(the objective function and maybe constraints) in `initialize_solver()` and
+the process of solving the optimization problem in `select_and_evaluate()`.
+The search procedures for alternatives implemented in `AlternativeFeatureSelector` basically add
+further constraints (for alternatives) to the optimization problem and call the solving routine.
+We did this subclassing for the five feature-selection methods in our experiments, i.e.,
+mutual information (univariate filter), FCBF, model-based importance, mRMR, and greedy wrapper.
+There are further abstract superclasses extracting commonalities between feature selectors.
+In particular, `WhiteBoxFeatureSelector` is a good starting point if you want to optimize your
+objective with a solver (rather than only using the solver to check constraints while optimizing
+a black-box objective separately).
+`LinearQualityFeatureSelector` defines an objective that sums up the quality of individual
+features, so your subclass only has to define how to compute these qualities.
 
 ## Demo
 

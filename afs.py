@@ -16,8 +16,9 @@ from ortools.linear_solver import pywraplp
 import pandas as pd
 import sklearn.base
 import sklearn.feature_selection
-
-import prediction
+import sklearn.metrics
+import sklearn.model_selection
+import sklearn.tree
 
 
 class AlternativeFeatureSelector(metaclass=ABCMeta):
@@ -523,7 +524,8 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
     def __init__(self, prediction_model: Optional[sklearn.base.BaseEstimator] = None):
         super().__init__()
         if prediction_model is None:
-            prediction_model = prediction.create_model_for_fs()
+            prediction_model = sklearn.tree.DecisionTreeClassifier(criterion='entropy',
+                                                                   random_state=25)
         self._prediction_model = prediction_model
 
     # Compute the features' qualities by fitting a model and extracting importances from it.
@@ -644,7 +646,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                  max_iters: int = 1000):
         super().__init__()
         if prediction_model is None:
-            prediction_model = prediction.create_model_for_fs()
+            prediction_model = sklearn.tree.DecisionTreeClassifier(criterion='entropy',
+                                                                   random_state=25)
         self._prediction_model = prediction_model
         self._max_iters = max_iters
         self._objective_agg = None
@@ -672,6 +675,17 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
             return min(new_Q_list) > min(old_Q_list)
         raise ValueError('Unknown objective aggregation.')
 
+    # Evaluate the wrapped model with a stratified holdout split on the data defined by "X" (where
+    # features are selected) and "y". Return the prediction performance on the validation set.
+    def evaluate_wrapper(self, X: pd.DataFrame, y: pd.Series) -> float:
+        X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(
+            X, y, test_size=0.2, shuffle=True, stratify=y, random_state=25)
+        if len(X_train.columns) == 0:  # no features selected (no valid solution found)
+            return float('nan')
+        self._prediction_model.fit(X=X_train, y=y_train)
+        pred_test = self._prediction_model.predict(X=X_test)
+        return sklearn.metrics.matthews_corrcoef(y_true=y_test, y_pred=pred_test)
+
     # Run a greedy hill-climbing procedure to select features. In particular, start with a feature
     # set satisfying all constraints and systematically try flipping the current selection decisions
     # of two features. Continue with a new solution if it has higher quality than the currently
@@ -692,9 +706,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
         else:
             s_value_list = [[bool(s_j.solution_value()) for s_j in s] for s in s_list]
             # Note that "training" quality actually is validation performance with a holdout split
-            Q_train_list = [prediction.evaluate_wrapper(
-                model=self._prediction_model, X=self._X_train.iloc[:, s_value], y=self._y_train)
-                for s_value in s_value_list]
+            Q_train_list = [self.evaluate_wrapper(
+                X=self._X_train.iloc[:, s_value], y=self._y_train) for s_value in s_value_list]
             j_1 = 0  # other than pseudo-code in paper, 0-indexing here
             j_2 = j_1 + 1
             swap_variables = []
@@ -711,9 +724,9 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                 if optimization_status in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
                     current_s_value_list = [[bool(s_j.solution_value()) for s_j in s]
                                             for s in s_list]
-                    current_Q_train_list = [prediction.evaluate_wrapper(
-                        model=self._prediction_model, X=self._X_train.iloc[:, s_value],
-                        y=self._y_train) for s_value in current_s_value_list]
+                    current_Q_train_list = [self.evaluate_wrapper(
+                        X=self._X_train.iloc[:, s_value], y=self._y_train)
+                        for s_value in current_s_value_list]
                     if self.has_objective_improved(old_Q_list=Q_train_list,
                                                    new_Q_list=current_Q_train_list):
                         s_value_list = current_s_value_list
@@ -741,9 +754,8 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                 # a new prediction model on one part of it and evaluate the model on the rest of it;
                 # the main experimental pipeline contains the "classic" evaluation with training
                 # model on (full) training set and predicting on full train + test
-                'test_objective': [prediction.evaluate_wrapper(
-                    model=self._prediction_model, X=self._X_test.iloc[:, idxs],
-                    y=self._y_test) for idxs in selected_idxs]
+                'test_objective': [self.evaluate_wrapper(
+                    X=self._X_test.iloc[:, idxs], y=self._y_test) for idxs in selected_idxs]
             })
         end_time = time.process_time()
         result['optimization_time'] = end_time - start_time
