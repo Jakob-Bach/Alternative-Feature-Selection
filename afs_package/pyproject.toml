@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "afs"
+version = "0.0.1"
+authors = [
+    {name="Jakob Bach"},
+]
+description = "Alternative feature selection"
+keywords = ["feature selection", "alternatives", "constraints"]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.22.3",
+    "ortools>=9.3.10497",
+    "pandas>=1.4.1",
+    "scikit-learn>=1.0.2",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/Jakob-Bach/Alternative-Feature-Selection"
+Issues = "https://github.com/Jakob-Bach/Alternative-Feature-Selection/issues"

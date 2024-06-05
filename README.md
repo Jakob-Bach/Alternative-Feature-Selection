@@ -17,11 +17,14 @@ You can find the corresponding complete experimental data (inputs as well as res
 Use the tags `run-2023-06-23` and `evaluation-2023-07-04` for reproducing the [experimental data for v1](https://doi.org/10.35097/1623) of the paper.
 Use the tags `run-2024-01-23` and `evaluation-2024-02-01` for reproducing the [experimental data for v2](https://doi.org/10.35097/1920) of the paper.
 
-This document describes the repo structure, a short demo, and the steps to reproduce the experiments.
+This document provides:
 
-## Repo Structure and Developer Info
+- An outline of the [repo structure](#repo-structure).
+- Steps for [setting up](#setup) a virtual environment and [reproducing](#reproducing-the-experiments) the experiments.
 
-Currently, the repository contains six Python files and four non-code files.
+## Repo Structure
+
+Currently, the repository contains five Python files and four non-code files.
 The non-code files are:
 
 - `.gitignore`: For Python development.
@@ -29,7 +32,7 @@ The non-code files are:
 - `README.md`: You are here :upside_down_face:
 - `requirements.txt`: To set up an environment with all necessary dependencies; see below for details.
 
-Five of the code files are directly related to our experiments (see below for details):
+The code files comprise our experimental pipeline (see below for details):
 
 - `prepare_datasets.py`: First stage of the experiments
   (download prediction datasets).
@@ -39,96 +42,9 @@ Five of the code files are directly related to our experiments (see below for de
   (compute statistics and create plots for the paper).
 - `data_handling.py`: Functions for working with prediction datasets and experimental data.
 
-In contrast, `afs.py` contains classes and functions for alternative feature selection.
-If you want to use, modify, or extend alternative feature selection,
-only this file might be relevant for you.
-`AlternativeFeatureSelector` is the abstract superclass.
-It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
-two search procedures, i.e., sequential as well as simultaneous (sum-aggregation and min-aggregation).
-To integrate a new feature-selection method, you need to create a subclass.
-The subclass needs to define the optimization problem of the feature-selection method
-(the objective function and maybe constraints) in `initialize_solver()` and
-the process of solving the optimization problem in `select_and_evaluate()`.
-The search procedures for alternatives implemented in `AlternativeFeatureSelector` basically add
-further constraints (for alternatives) to the optimization problem and call the solving routine.
-We did this subclassing for the five feature-selection methods in our experiments, i.e.,
-mutual information (univariate filter), FCBF, model-based importance, mRMR, and greedy wrapper.
-There are further abstract superclasses extracting commonalities between feature selectors.
-In particular, `WhiteBoxFeatureSelector` is a good starting point if you want to optimize your
-objective with a solver (rather than only using the solver to check constraints while optimizing
-a black-box objective separately).
-`LinearQualityFeatureSelector` defines an objective that sums up the quality of individual
-features, so your subclass only has to define how to compute these qualities.
-
-## Demo
-
-Running alternative feature selection only requires three steps:
-
-1) Create the feature selector (our code contains five different ones).
-2) Set the dataset:
-    - Four parameters: feature part and prediction target are separated, train-test split
-    - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
-3) Run the search for alternatives:
-    - Method name (`search_sequentially()` / `search_simultaneously()`) determines whether
-      a sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s (like "MI" and
-      model-based importance) also support the heuristic procedures `search_greedy_replacement()`
-      and `search_greedy_balancing()`, which are described in the Appendix of the arXiv paper.
-    - `k` determines the number of features to be selected.
-    - `num_alternatives` determines ... you can guess what.
-    - `tau_abs` determines by how many features the feature sets should differ.
-      You can also provide a relative value (from the interval `[0,1]`) via `tau`,
-      and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
-    - `objective_agg` switches between min-aggregation and sum-aggregation in simultaneous search.
-      Has no effect in sequential search (which only returns one feature set, so there is no need to
-      aggregate feature-set quality over feature sets).
-
-```python
-import afs
-import sklearn.datasets
-import sklearn.model_selection
-
-dataset = sklearn.datasets.load_iris(as_frame=True)
-X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(
-    dataset['data'], dataset['target'], train_size=0.8, random_state=25)
-feature_selector = afs.MISelector()
-feature_selector.set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
-search_result = feature_selector.search_sequentially(k=3, num_alternatives=5, tau_abs=1)
-print(search_result.drop(columns='optimization_time').round(2))
-```
-
-The search result is a `DataFrame` containing the indices of the selected features (can be used to
-subset the columns in `X`), objective values on the training set and test set, optimization status,
-and optimization time:
-
-```
-  selected_idxs  train_objective  test_objective  optimization_status
-0     [0, 2, 3]             0.91            0.89                    0
-1     [1, 2, 3]             0.83            0.78                    0
-2     [0, 1, 3]             0.64            0.65                    0
-3     [0, 1, 2]             0.62            0.68                    0
-4            []              NaN             NaN                    2
-5            []              NaN             NaN                    2
-```
-
-The search procedure ran out of features here, as the `iris` dataset only has four features.
-The optimization statuses are:
-
-- 0: `Optimal` (optimal solution found)
-- 1: `Feasible` (a valid solution found till timeout, but may not be optimal)
-- 2: `Infeasible` (there is no valid solution)
-- 6: `Not solved` (no valid solution found till timeout, but there may be one)
-
-If you don't want to provide a dataset but use manually defined univariate qualities
-(which result in the same optimization problem as "MI" and model importance), you can do so as well:
-
-```python
-import afs
-
-feature_selector = afs.ManualQualityUnivariateSelector()
-feature_selector.set_data(q_train=[1, 2, 3, 7, 8, 9])
-search_result = selector.search_sequentially(k=3, num_alternatives=3, tau_abs=2)
-print(search_result.drop(columns='optimization_time').round(2))
-```
+Additionally, we have organized the (alternative) feature-selection methods for our experiments
+as the standalone Python package `afs`, located in the directory `afs_package/`.
+See the corresponding [README](afs_package/README.md) for more information.
 
 ## Setup
 
