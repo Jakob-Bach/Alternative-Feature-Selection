@@ -1,6 +1,6 @@
 # Alternative Feature Selection
 
-This repository contains the code of two papers:
+This repository contains the code of two papers and a dissertation:
 
 > Bach, Jakob, and Klemens Böhm. "Alternative feature selection with user control"
 
@@ -17,6 +17,11 @@ You can find the corresponding complete experimental data (inputs as well as res
 Use the tags `run-2023-06-23` and `evaluation-2023-07-04` for reproducing the [experimental data for v1](https://doi.org/10.35097/1623) of the paper.
 Use the tags `run-2024-01-23` and `evaluation-2024-02-01` for reproducing the [experimental data for v2](https://doi.org/10.35097/1920) of the paper.
 
+> Bach, Jakob. "Leveraging Constraints for User-Centric Feature Selection"
+
+is a dissertation in progress.
+Once it is published, we will link it (and its experimental data) here as well.
+
 This document provides:
 
 - An outline of the [repo structure](#repo-structure).
@@ -24,7 +29,7 @@ This document provides:
 
 ## Repo Structure
 
-Currently, the repository contains five Python files and four non-code files.
+Currently, the repository contains six Python files and four non-code files.
 The non-code files are:
 
 - `.gitignore`: For Python development.
@@ -38,8 +43,8 @@ The code files comprise our experimental pipeline (see below for details):
   (download prediction datasets).
 - `run_experiments.py`: Second stage of the experiments
   (run feature selection, search for alternatives, and make predictions).
-- `run_evaluation_(arxiv|journal).py`: Third stage of the experiments
-  (compute statistics and create plots for the paper).
+- `run_evaluation_(arxiv|dissertation|journal).py`: Third stage of the experiments
+  (compute statistics and create plots).
 - `data_handling.py`: Functions for working with prediction datasets and experimental data.
 
 Additionally, we have organized the (alternative) feature-selection methods for our experiments
@@ -153,20 +158,16 @@ In this case, or if you had to abort the experimental run for other reasons, you
 experimental pipeline by calling the same script again; it automatically detects existing results
 and only runs the remaining tasks.
 
-To print statistics and create the plots for the paper, run
+To print statistics and create the plots, run
 
 ```bash
-python -m run_evaluation_arxiv
+python -m run_evaluation_<<version>>
 ```
 
-or
+with `<<version>>` being one of `arxiv`, `dissertation`, or `journal`.
 
-```bash
-python -m run_evaluation_journal
-```
-
-(The journal version is more focused and therefore contains less evaluations.
-Also, the plots are formatted a bit differently.)
+(The evaluation length differs between versions, as does the plot formatting.
+The arXiv version has the longest and most detailed evaluation.)
 
 All scripts have a few command-line options, which you can see by running the scripts like
 

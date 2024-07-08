@@ -1,4 +1,4 @@
-"""Run evaluation
+"""Run journal evaluation
 
 Script to compute summary statistics and create plots for the journal version of the paper. Should
 be run after the experimental pipeline, as this script requires the pipeline's outputs as inputs.

@@ -1,9 +1,9 @@
-"""Run arXiv evaluation
+"""Run dissertation evaluation
 
-Script to compute summary statistics and create plots for the arXiv version of the paper. Should be
-run after the experimental pipeline, as this script requires the pipeline's outputs as inputs.
+Script to compute summary statistics and create plots for the dissertation. Should be run after the
+experimental pipeline, as this script requires the pipeline's outputs as inputs.
 
-Usage: python -m run_evaluation_arxiv --help
+Usage: python -m run_evaluation_dissertation --help
 """
 
 
@@ -920,8 +920,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
 # Parse some command-line arguments and run the main routine.
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Creates the paper\'s plots and print statistics.',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description='Creates the dissertations\'s plots and print statistics.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--data', type=pathlib.Path, default='data/datasets/', dest='data_dir',
                         help='Directory with prediction datasets in (X, y) form.')
     parser.add_argument('-r', '--results', type=pathlib.Path, default='data/results/',
