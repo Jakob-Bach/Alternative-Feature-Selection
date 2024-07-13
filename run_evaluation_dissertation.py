@@ -25,6 +25,7 @@ import data_handling
 
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['figure.max_open_warning'] = 0
+DEFAULT_COL_PALETTE = 'YlGnBu'
 
 
 # Main-routine: run complete evaluation pipeline. To that end, read results from the "results_dir"
@@ -127,13 +128,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
                            (results['n_alternative'] == 0) & (results['fs_name'] == 'MI')].copy()
     plot_results['k/n'] = plot_results['k'] / plot_results['n']
+    plot_results['k'] = plot_results['k'].astype(str)  # treat as categorical for hue
     plot_metrics = ['train_objective', 'decision_tree_test_mcc']
     plot_results = plot_results.groupby(['dataset_name', 'k', 'k/n'])[plot_metrics].mean(
         ).reset_index()  # average over cross-validation folds (per dataset and k)
     for metric in plot_metrics:
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
-        sns.scatterplot(x='k/n', y=metric, hue='k', style='k', data=plot_results, palette='Set2')
+        sns.scatterplot(x='k/n', y=metric, hue='k', style='k', data=plot_results,
+                        palette=DEFAULT_COL_PALETTE)
         plt.xlabel('Relative feature-set size $k/n$')
         plt.ylabel(metric_name_mapping[metric])
         plt.ylim((-0.1, 1.1))
@@ -168,7 +171,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='Metric', y='Train-test difference', hue='fs_name', data=plot_results,
-                palette='RdPu', fliersize=1, hue_order=fs_name_plot_order)
+                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
     plt.ylim(-0.55, 1.35)
     plt.yticks(np.arange(start=-0.4, stop=1.3, step=0.2))
     plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
@@ -220,8 +223,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # method
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
-    sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results, palette='RdPu',
-                fliersize=1, hue_order=fs_name_plot_order)
+    sns.boxplot(x='k', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
+                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Feature-set size $k$')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
     plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
@@ -266,8 +269,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
-    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='RdPu',
-                fliersize=1, hue_order=fs_name_plot_order)
+    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,
+                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
     plt.ylabel('Difference $k$=10 vs. $k$=5', y=0.45)  # moved a bit downwards to fit on plot
     plt.ylim(-0.65, 0.65)
     plt.yticks(np.arange(start=-0.6, stop=0.7, step=0.2))
@@ -315,7 +318,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='RdPu', fliersize=1, hue_order=search_name_hue_order_solver)
+                    palette=DEFAULT_COL_PALETTE, fliersize=1,
+                    hue_order=search_name_hue_order_solver)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
         plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
@@ -343,7 +347,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                    palette='RdPu', fliersize=1, hue_order=search_name_hue_order_solver)
+                    palette=DEFAULT_COL_PALETTE, fliersize=1,
+                    hue_order=search_name_hue_order_solver)
         plt.xlabel('Number of alternatives $a$')
         plt.ylabel(f'Mean of {metric_name_mapping[metric]}')
         plt.ylim(ylim)
@@ -360,7 +365,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
     sns.boxplot(x='search_name', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
-                palette='RdPu', fliersize=1, hue_order=fs_name_plot_order)
+                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
     plt.xlabel('Search')
     plt.xticks(rotation=10, horizontalalignment='right')
     plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
@@ -396,8 +401,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     plot_results['Metric'].replace(metric_name_mapping, inplace=True)
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
-    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,  palette='RdPu',
-                fliersize=1, hue_order=fs_name_plot_order)
+    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,
+                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
     plt.ylabel('Difference sim. vs. seq.')
     plt.ylim(-0.35, 0.35)
     plt.yticks(np.arange(start=-0.3, stop=0.4, step=0.1))
@@ -568,7 +573,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(8, 3))
         plt.rcParams['font.size'] = 15
         sns.boxplot(x='n_alternative', y='quality', hue='Metric', data=plot_results,
-                    palette='RdPu', fliersize=1)
+                    palette=DEFAULT_COL_PALETTE, fliersize=1)
         plt.xlabel('Number of alternative')
         plt.ylabel('Normalized Quality', y=0.37)   # moved a bit downwards to fit on plot
         plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
@@ -587,7 +592,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 plt.figure(figsize=(5, 5))
                 plt.rcParams['font.size'] = 18
                 sns.lineplot(x='n_alternative', y=metric, hue='fs_name', style='fs_name',
-                             data=plot_results, palette='RdPu', hue_order=fs_name_plot_order,
+                             data=plot_results, palette='Dark2', hue_order=fs_name_plot_order,
                              style_order=fs_name_plot_order)
                 plt.xlabel('Number of alternative')
                 plt.xticks(range(11))
@@ -665,12 +670,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plot_results['tau'] = plot_results['tau_abs'] / 10
             plt.figure(figsize=(4, 3))
             plt.rcParams['font.size'] = 15
-            sns.lineplot(x='n_alternative', y=metric, hue='tau', data=plot_results, palette='RdPu',
-                         hue_norm=(-0.2, 1), legend=False)
+            sns.lineplot(x='n_alternative', y=metric, hue='tau', data=plot_results,
+                         palette=DEFAULT_COL_PALETTE, hue_norm=(-0.2, 1), legend=False)
             # Use color scale instead of standard line plot legend; start color scaling at -0.2, so
             # that the color for the actual lowest value (tau=0) is more readable (darker):
             cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
-                cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
+                cmap=DEFAULT_COL_PALETTE, norm=plt.Normalize(-0.2, 1)),
+                values=plot_results['tau'].unique())
             cbar.ax.invert_yaxis()  # put low values at top (like most lines are ordered)
             cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
             cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
@@ -691,8 +697,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plot_results['tau'] = plot_results['tau_abs'] / 10
             plt.figure(figsize=(5, 5))
             plt.rcParams['font.size'] = 18
-            sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name',
-                         data=plot_results, palette='RdPu', hue_order=fs_name_plot_order,
+            sns.lineplot(x='tau', y=metric, hue='fs_name', style='fs_name', data=plot_results,
+                         palette='Dark2', hue_order=fs_name_plot_order,
                          style_order=fs_name_plot_order)
             plt.xlabel('$\\tau$')
             plt.xticks(np.arange(start=0.2, stop=1.1, step=0.2))
@@ -727,9 +733,10 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
         sns.lineplot(x='n_alternative', y='optimization_status', hue='tau', data=plot_results,
-                     palette='RdPu', hue_norm=(-0.2, 1), legend=False)
+                     palette=DEFAULT_COL_PALETTE, hue_norm=(-0.2, 1), legend=False)
         cbar = plt.colorbar(ax=plt.gca(), mappable=plt.cm.ScalarMappable(
-            cmap="RdPu", norm=plt.Normalize(-0.2, 1)), values=plot_results['tau'].unique())
+            cmap=DEFAULT_COL_PALETTE, norm=plt.Normalize(-0.2, 1)),
+            values=plot_results['tau'].unique())
         cbar.ax.invert_yaxis()  # put low values at top (like most lines are ordered)
         cbar.ax.set_title('$\\tau}$', y=0, pad=-20, loc='left')
         cbar.ax.set_yticks(np.arange(start=0.2, stop=1.1, step=0.2))
@@ -778,7 +785,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             plt.figure(figsize=(8, 3))
             plt.rcParams['font.size'] = 15
             sns.boxplot(x='num_alternatives', y=metric, hue='search_name', data=plot_results,
-                        palette='RdPu', fliersize=1, hue_order=search_name_hue_order_all)
+                        palette=DEFAULT_COL_PALETTE, fliersize=1,
+                        hue_order=search_name_hue_order_all)
             plt.xlabel('Number of alternatives $a$')
             plt.ylabel(f'$\\sigma$ of {metric_name_mapping[metric]}')
             plt.yticks(np.arange(start=0, stop=0.35, step=0.1))
@@ -839,6 +847,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plot_results = plot_results.loc[:, (slice(None), ['', 'diff'])]  # keep "diff" & non-search
         plot_results = plot_results.droplevel(level='search_name', axis='columns')
 
+        # Not all feature-selection methods compared; still retain their global order and color:
+        heu_fs_name_plot_order = [x for x in fs_name_plot_order
+                                  if x in plot_results['fs_name'].unique()]
+        heu_fs_col_palette = [col for col, fs_name in zip(
+            sns.color_palette(DEFAULT_COL_PALETTE, len(fs_name_plot_order)), fs_name_plot_order
+            ) if fs_name in heu_fs_name_plot_order]
+
         parameters = [('a', 'Number of alternatives $a$', 'num-alternatives'),
                       ('tau', 'Dissimilarity threshold $\\tau$', 'tau')]
         for parameter, parameter_label, parameter_file_infix in parameters:
@@ -856,8 +871,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             metric = 'train_objective'
             plt.figure(figsize=(5, 5))
             plt.rcParams['font.size'] = 18
-            sns.boxplot(x=parameter, y=metric, hue='fs_name', data=plot_results,  palette='RdPu',
-                        fliersize=1)
+            sns.boxplot(x=parameter, y=metric, hue='fs_name', data=plot_results,
+                        palette=heu_fs_col_palette, hue_order=heu_fs_name_plot_order, fliersize=1)
             plt.xlabel(parameter_label)
             plt.ylabel(f'$\\Delta${metric_name_mapping[metric]} ({search_method_pair[0]} ' +
                        f'vs. {search_method_pair[1]})')
