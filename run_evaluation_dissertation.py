@@ -126,7 +126,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     # Figure 10: Feature-set quality by feature-set size "k" and dataset size "n"
     plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
-                           (results['n_alternative'] == 0) & (results['fs_name'] == 'MI')].copy()
+                           (results['n_alternative'] == 0) & (results['fs_name'] == 'Model Gain')
+                           ].copy()
     plot_results['k/n'] = plot_results['k'] / plot_results['n']
     plot_results['k'] = plot_results['k'].astype(str)  # treat as categorical for hue
     plot_metrics = ['train_objective', 'decision_tree_test_mcc']
@@ -313,7 +314,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
         # Figures 1a, 1c, 1e: Standard deviation of feature-set quality in search runs by search
         # method
-        plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
+        plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
         plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
@@ -342,7 +343,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
 
         # Figures 1b, 1d, 1f: Average feature-set quality in search runs by search method
-        plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
+        plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
         plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
         plt.figure(figsize=(4, 3))
         plt.rcParams['font.size'] = 15
@@ -566,7 +567,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 ).pivot(index='n_alternative', columns='fs_name').round(2))
 
         # Figures 3a-3d: Feature-set quality by number of alternatives and evaluation metric
-        plot_results = norm_results[(norm_results['fs_name'] == 'MI')].melt(
+        plot_results = norm_results[(norm_results['fs_name'] == 'Model Gain')].melt(
             id_vars='n_alternative', value_vars=plot_metrics, var_name='Metric',
             value_name='quality')
         plot_results['Metric'].replace(metric_name_mapping, inplace=True)
@@ -609,12 +610,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     for k in results['k'].unique():
         print('\nHow is the optimization status distributed for different iterations',
-              f'(alternatives) (for sequential search with k={k} and MI as feature-selection',
-              'method)?')
+              f'(alternatives) (for sequential search with k={k} and Model Gain as',
+              'feature-selection method)?')
         print(pd.crosstab(
-            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'seq.') &
+            results.loc[(results['fs_name'] == 'Model Gain') & (results['search_name'] == 'seq.') &
                         (results['k'] == k), 'n_alternative'],
-            results.loc[(results['fs_name'] == 'MI') & (results['search_name'] == 'seq.') &
+            results.loc[(results['fs_name'] == 'Model Gain') & (results['search_name'] == 'seq.') &
                         (results['k'] == k), 'optimization_status'],
             normalize='index').applymap('{:.2%}'.format))
 
@@ -652,20 +653,20 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         print(f'\nHow does the feature-set quality ({normalization_name}-normalized per',
               'experimental setting) (Spearman-)correlate with dataset dimensionality "n" for ',
               'each alternative and dissimilarity treshold "tau" (for sequential search with k=10',
-              'and MI as feature-selection method)?')
+              'and Model Gain as feature-selection method)?')
         for metric in plot_metrics:
             with warnings.catch_warnings():
                 warnings.filterwarnings(action='ignore',
                                         category=scipy.stats.SpearmanRConstantInputWarning)
                 print('Metric:', metric)
-                print(norm_results[norm_results['fs_name'] == 'MI'].groupby(
+                print(norm_results[norm_results['fs_name'] == 'Model Gain'].groupby(
                     ['n_alternative', 'tau_abs']).apply(lambda x: x[metric].corr(
                         x['n'], method='spearman')).rename('').reset_index().pivot(
                             index='tau_abs', columns='n_alternative').round(2))
 
             # Figures 5a-5f: Feature-set quality by number of alternatives and dissimilarity
             # threshold "tau"
-            plot_results = norm_results[norm_results['fs_name'] == 'MI'].groupby(
+            plot_results = norm_results[norm_results['fs_name'] == 'Model Gain'].groupby(
                 ['n_alternative', 'tau_abs'])[metric].mean().reset_index()
             plot_results['tau'] = plot_results['tau_abs'] / 10
             plt.figure(figsize=(4, 3))
@@ -716,11 +717,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-- Optimization status --')
 
     for k in results['k'].unique():
-        plot_results = results[(results['fs_name'] == 'MI') & (results['k'] == k) &
+        plot_results = results[(results['fs_name'] == 'Model Gain') & (results['k'] == k) &
                                (results['search_name'] == 'seq.')]
 
-        print('\nHow is the optimization status distributed for different dissimilarity thresholds',
-              f'"tau" (for sequential search with k={k} and MI as feature-selection method)?')
+        print('\nHow is the optimization status distributed for different dissimilarity',
+              f'thresholds "tau" (for sequential search with k={k} and Model Gain as',
+              'feature-selection method)?')
         print(pd.crosstab(plot_results['tau_abs'], plot_results['optimization_status'],
                           normalize='index').applymap('{:.2%}'.format))
 
@@ -780,7 +782,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         if metric in ('train_objective', 'test_objective'):
             # Figures 8a, 8b: Standard deviation of feature-set quality in search runs by search
             # method (including heuristics)
-            plot_results = comparison_results[comparison_results['fs_name'] == 'MI']
+            plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
             plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
             plt.figure(figsize=(8, 3))
             plt.rcParams['font.size'] = 15
