@@ -66,13 +66,12 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     group_cols = ['dataset_name', 'split_idx', 'fs_name', 'search_name', 'k', 'tau_abs',
                   'num_alternatives']
     # Define columns for evaluation metrics:
-    quality_metrics = [x for x in results.columns if 'train' in x or 'test' in x]
+    quality_metrics = [x for x in results.columns if ('train' in x or 'test' in x)
+                       and ('forest' not in x)]
     metric_name_mapping = {'train_objective': '$Q_{\\mathrm{train}}$',
                            'test_objective': '$Q_{\\mathrm{test}}$',
                            'decision_tree_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{tree}}$',
-                           'decision_tree_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$',
-                           'random_forest_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{forest}}$',
-                           'random_forest_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{forest}}$'}
+                           'decision_tree_test_mcc': '$MCC_{\\mathrm{test}}^{\\mathrm{tree}}$'}
     # Number the alternatives (however, they only have a natural order in sequential search)
     results['n_alternative'] = results.groupby(group_cols).cumcount()
 
@@ -161,8 +160,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # metric and feature-selection method
     metric_pairs = {
         'Q': ('train_objective', 'test_objective'),
-        '$MCC^{\\mathrm{tree}}$': ('decision_tree_train_mcc', 'decision_tree_test_mcc'),
-        '$MCC^{\\mathrm{forest}}$': ('random_forest_train_mcc', 'random_forest_test_mcc')
+        '$MCC^{\\mathrm{tree}}$': ('decision_tree_train_mcc', 'decision_tree_test_mcc')
     }
     plot_results = solver_results[['fs_name'] + quality_metrics].copy()
     for metric, metric_pair in metric_pairs.items():
@@ -190,9 +188,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             columns={'level_3': 'Metric'})
     print_results = plot_results.groupby(['fs_name', 'Metric'], sort=False)[quality_metrics].mean(
         ).round(2).reset_index().set_index('Metric')
-    print_results = print_results.drop(
-        index=['random_forest_train_mcc', 'random_forest_test_mcc'],
-        columns=['random_forest_train_mcc', 'random_forest_test_mcc'])
     print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
                                          index=(lambda x: x.replace('decision_', '')))
     for fs_name in print_results['fs_name'].unique():
