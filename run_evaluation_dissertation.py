@@ -66,8 +66,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     group_cols = ['dataset_name', 'split_idx', 'fs_name', 'search_name', 'k', 'tau_abs',
                   'num_alternatives']
     # Define columns for evaluation metrics:
-    quality_metrics = [x for x in results.columns if ('train' in x or 'test' in x)
-                       and ('forest' not in x)]
     metric_name_mapping = {'train_objective': '$Q_{\\mathrm{train}}$',
                            'test_objective': '$Q_{\\mathrm{test}}$',
                            'decision_tree_train_mcc': '$MCC_{\\mathrm{train}}^{\\mathrm{tree}}$',
@@ -106,63 +104,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n-------- 6.4 Evaluation --------')
 
     solver_results = results[results['search_name'].isin(search_name_hue_order_solver)]
-
-    print('\n---- Feature-Set Quality Metrics ----')
-
-    print('\n-- Prediction models and overfitting --')
-
-    print('\nHow is the prediction performance distributed for different prediction models (for',
-          'solver-based search)?')
-    print(solver_results[[x for x in solver_results.columns if '_mcc' in x]].describe(
-        ).round(2).transpose())
-
-    # Figure 11a: Difference in feature-set quality between training set and test set by evaluation
-    # metric and feature-selection method
-    metric_pairs = {
-        'Q': ('train_objective', 'test_objective'),
-        '$MCC^{\\mathrm{tree}}$': ('decision_tree_train_mcc', 'decision_tree_test_mcc')
-    }
-    plot_results = solver_results[['fs_name'] + quality_metrics].copy()
-    for metric, metric_pair in metric_pairs.items():
-        plot_results[metric] = plot_results[metric_pair[0]] - plot_results[metric_pair[1]]
-    plot_results = plot_results.melt(id_vars='fs_name', value_vars=list(metric_pairs.keys()),
-                                     var_name='Metric', value_name='Train-test difference')
-    plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 18
-    sns.boxplot(x='Metric', y='Train-test difference', hue='fs_name', data=plot_results,
-                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
-    plt.ylim(-0.55, 1.35)
-    plt.yticks(np.arange(start=-0.4, stop=1.3, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
-               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
-    plt.tight_layout()
-    plt.savefig(plot_dir / 'afs-evaluation-metrics-overfitting.pdf')
-
-    print('\n-- Correlation between evaluation metrics --')
-
-    print('\nHow do the evaluation metrics (Spearman-)correlate for different feature-selection',
-          'methods (for solver-based search; averaged over datasets and cross-validation folds)?')
-    plot_results = solver_results.groupby(['dataset_name', 'split_idx', 'fs_name'])[
-        quality_metrics].corr(method='spearman').reset_index().rename(
-            columns={'level_3': 'Metric'})
-    print_results = plot_results.groupby(['fs_name', 'Metric'], sort=False)[quality_metrics].mean(
-        ).round(2).reset_index().set_index('Metric')
-    print_results = print_results.rename(columns=(lambda x: x.replace('decision_', '')),
-                                         index=(lambda x: x.replace('decision_', '')))
-    for fs_name in print_results['fs_name'].unique():
-        print(f'Correlation for feature-selection method "{fs_name}":')
-        print(print_results[print_results['fs_name'] == fs_name].drop(columns='fs_name'))
-
-    # Figure 11b: Correlation between evaluation metrics for feature-set quality
-    plot_results = plot_results.groupby('Metric', sort=False)[quality_metrics].mean().round(2)
-    plot_results.rename(columns=metric_name_mapping, index=metric_name_mapping, inplace=True)
-    plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 16
-    sns.heatmap(plot_results, vmin=-1, vmax=1, cmap='PRGn', annot=True, square=True, cbar=False)
-    plt.ylabel(None)
-    plt.tight_layout()
-    plt.savefig(plot_dir / 'afs-evaluation-metrics-correlation.pdf')
 
     print('\n---- Feature-Selection Methods ----')
 
