@@ -103,9 +103,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-------- 6.4 Evaluation --------')
 
-    solver_results = results[results['search_name'].isin(search_name_hue_order_solver)]
-
-    print('\n---- Feature-Selection Methods ----')
+    print('\n------ 6.4.1 Feature-Selection Methods ------')
 
     plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
                            (results['n_alternative'] == 0)]
@@ -116,7 +114,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'feature-selection methods (for the original feature sets of sequential search)?')
     print(plot_results.groupby('fs_name')['decision_tree_test_mcc'].describe().round(2))
 
-    # Figure 12a: Test-set prediction performance by feature-set size "k" and feature-selection
+    # Figure 6.1a: Test-set prediction performance by feature-set size "k" and feature-selection
     # method
     plt.figure(figsize=(5, 5))
     plt.rcParams['font.size'] = 18
@@ -141,6 +139,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\nHow is the optimization status distributed for different feature-selection methods',
           '(for solver-based search)?')
+    solver_results = results[results['search_name'].isin(search_name_hue_order_solver)]
     print(pd.crosstab(solver_results['optimization_status'], solver_results['fs_name'],
                       normalize='columns').applymap('{:.2%}'.format))
 
@@ -151,7 +150,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Influence of feature-set size "k" --')
 
-    # Figure 12b: Difference in feature-set quality between feature-set sizes "k" by evaluation
+    # Figure 6.1b: Difference in feature-set quality between feature-set sizes "k" by evaluation
     # metric and feature-selection method
     plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
     plot_results = plot_results[['dataset_name', 'split_idx', 'fs_name', 'k'] + plot_metrics].copy()
@@ -181,8 +180,6 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'k=10 and k=5 for different feature-selection methods (for the original feature sets of',
           'sequential search)?')
     print(plot_results.groupby(['Metric', 'fs_name']).median().round(2))
-
-    print('\n-------- Evaluation --------')
 
     print('\n------ Solver-Based Search Methods for Alternatives ------')
 
