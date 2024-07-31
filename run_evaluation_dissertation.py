@@ -75,20 +75,21 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     # Number the alternatives (however, they only have a natural order in sequential search)
     results['n_alternative'] = results.groupby(group_cols).cumcount()
 
-    print('\n-------- Experimental Design --------')
+    print('\n-------- 6.3 Experimental Design --------')
 
-    print('\n------ Methods ------')
+    print('\n------ 6.3.3 Methods ------')
 
-    print('\n---- Alternatives (Constraints) ----')
+    print('\n---- 6.3.3.3 Alternatives (Constraints) ----')
+
+    print('\n-- Timeout --')
 
     print('\nHow is the optimization status distributed (for solver-based search)?')
     print(results.loc[results['search_name'].isin(search_name_hue_order_solver),
                       'optimization_status'].value_counts(normalize=True).apply('{:.2%}'.format))
 
-    print('\n------ Datasets ------')
+    print('\n------ 6.3.4 Datasets ------')
 
-    # Table 2
-    print('\n## Table: Dataset overview ##\n')
+    print('\n## Table 6.2: Dataset overview ##\n')
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
     dataset_overview['Mean corr.'] = dataset_overview['dataset'].apply(
@@ -102,50 +103,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(dataset_overview.style.format(escape='latex', precision=2).hide(axis='index').to_latex(
         hrules=True))
 
-    print('\n-------- Appendix --------')
-
-    print('\n------ Evaluation ------')
+    print('\n-------- 6.4 Evaluation --------')
 
     solver_results = results[results['search_name'].isin(search_name_hue_order_solver)]
-
-    print('\n---- Datasets ----')
-
-    print('\nHow is the mean feature-set quality per dataset distributed (for solver-based search)?')
-    print(solver_results.groupby('dataset_name')[
-        ['train_objective', 'decision_tree_test_mcc']].mean().describe().round(2))
-
-    print('\nHow does the feature set-quality (Spearman-)correlate with dataset dimensionality',
-          '"n" (for solver-based search)?')
-    print(solver_results[quality_metrics].corrwith(results['n'], method='spearman').round(2))
-
-    print('\nHow does the feature set-quality (Spearman-)correlate with relative feature-set size',
-          '"k/n" (for solver-based search)?')
-    print(solver_results[quality_metrics].corrwith(results['k'] / results['n'],
-                                                   method='spearman').round(2))
-
-    # Figure 10: Feature-set quality by feature-set size "k" and dataset size "n"
-    plot_results = results[(results['search_name'] == 'seq.') & (results['tau_abs'] == 1) &
-                           (results['n_alternative'] == 0) & (results['fs_name'] == 'Model Gain')
-                           ].copy()
-    plot_results['k/n'] = plot_results['k'] / plot_results['n']
-    plot_results['k'] = plot_results['k'].astype(str)  # treat as categorical for hue
-    plot_metrics = ['train_objective', 'decision_tree_test_mcc']
-    plot_results = plot_results.groupby(['dataset_name', 'k', 'k/n'])[plot_metrics].mean(
-        ).reset_index()  # average over cross-validation folds (per dataset and k)
-    for metric in plot_metrics:
-        plt.figure(figsize=(4, 3))
-        plt.rcParams['font.size'] = 15
-        sns.scatterplot(x='k/n', y=metric, hue='k', style='k', data=plot_results,
-                        palette=DEFAULT_COL_PALETTE)
-        plt.xlabel('Relative feature-set size $k/n$')
-        plt.ylabel(metric_name_mapping[metric])
-        plt.ylim((-0.1, 1.1))
-        plt.yticks(np.arange(start=0, stop=1.1, step=0.2))
-        leg = plt.legend(title='Feature-set size $k$', edgecolor='white', loc='upper left', ncols=2,
-                         bbox_to_anchor=(0.3, -0.1),  columnspacing=1, handletextpad=0, framealpha=0)
-        leg.get_title().set_position((-124, -22))
-        plt.tight_layout()
-        plt.savefig(plot_dir / f'afs-impact-dataset-k-{metric.replace("_", "-")}.pdf')
 
     print('\n---- Feature-Set Quality Metrics ----')
 
