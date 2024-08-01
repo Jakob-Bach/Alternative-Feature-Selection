@@ -181,7 +181,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'sequential search)?')
     print(plot_results.groupby(['Metric', 'fs_name']).median().round(2))
 
-    print('\n------ Solver-Based Search Methods for Alternatives ------')
+    print('\n------ 6.4.2 Solver-Based Search Methods for Alternatives ------')
 
     comparison_results = results[(results['search_name'].str.startswith('sim')) &
                                  (results['k'] == 5)]
@@ -205,8 +205,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
 
-        # Figures 1a, 1c, 1e: Standard deviation of feature-set quality in search runs by search
-        # method
+        # Figures 6.2a, 6.2c, 6.2e: Standard deviation of feature-set quality in search runs by
+        # search method
         plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
         plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
         plt.figure(figsize=(4, 3))
@@ -235,7 +235,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             ['fs_name', 'search_name', 'num_alternatives'])[metric].median().reset_index(
                 ).pivot(index=['fs_name', 'num_alternatives'], columns='search_name').round(3))
 
-        # Figures 1b, 1d, 1f: Average feature-set quality in search runs by search method
+        # Figures 6.2b, 6.2d, 6.2f: Average feature-set quality in search runs by search method
         plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
         plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
         plt.figure(figsize=(4, 3))
@@ -253,62 +253,21 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         plt.tight_layout()
         plt.savefig(plot_dir / f'afs-impact-search-mean-{metric.replace("_", "-")}.pdf')
 
-    # Figure 2a: Test-set prediction performance by search method and feature-selection method
-    plot_results = comparison_results[group_cols + ['decision_tree_test_mcc']].copy()
-    plot_results = plot_results.groupby(group_cols)['decision_tree_test_mcc'].mean().reset_index()
-    plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 18
-    sns.boxplot(x='search_name', y='decision_tree_test_mcc', hue='fs_name', data=plot_results,
-                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
-    plt.xlabel('Search')
-    plt.xticks(rotation=10, horizontalalignment='right')
-    plt.ylabel(metric_name_mapping['decision_tree_test_mcc'])
-    plt.yticks(np.arange(start=-0.4, stop=1.1, step=0.2))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.15),
-               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.06, y=0.13, s='Selection', rotation='vertical')
-    plt.tight_layout()
-    plt.savefig(plot_dir / 'afs-impact-search-fs-method-decision-tree-test-mcc.pdf')
-
-    print('\nWhat is the median training-set objective-value difference per experimental setting',
-          'between simultaneous search (summed-quality objective) and sequential search for',
-          'different feature-selection methods and numbers of alternatives (for k=5 and 1-5',
-          'alternatives)?')
-    plot_results = comparison_results.groupby(group_cols)['train_objective'].mean().reset_index(
-        ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
-                values='train_objective').reset_index()
-    plot_results['sim - seq'] = plot_results['sim. (sum)'] - plot_results['seq.']
-    print(plot_results.groupby(['fs_name', 'num_alternatives'])['sim - seq'].median().round(3))
-
-    # Figure 2b: Difference in feature-set quality between simultaneous and sequential search by
-    # evaluation metric and feature-selection method
-    plot_results = comparison_results.groupby(group_cols)[plot_metrics].mean().reset_index(
-        ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
-                values=plot_metrics).reset_index()
-    for metric in plot_metrics:
-        plot_results[(metric, 'diff')] = (plot_results[(metric, 'sim. (sum)')] -
-                                          plot_results[(metric, 'seq.')])
-    plot_results = plot_results.loc[:, (slice(None), ['', 'diff'])]  # keep "diff" & non-search cols
-    plot_results = plot_results.droplevel(level='search_name', axis='columns')
-    plot_results = plot_results.melt(id_vars='fs_name', value_vars=plot_metrics, var_name='Metric',
-                                     value_name='Difference')
-    plot_results['Metric'].replace(metric_name_mapping, inplace=True)
-    plt.figure(figsize=(5, 5))
-    plt.rcParams['font.size'] = 18
-    sns.boxplot(x='Metric', y='Difference', hue='fs_name', data=plot_results,
-                palette=DEFAULT_COL_PALETTE, fliersize=1, hue_order=fs_name_plot_order)
-    plt.ylabel('Difference sim. vs. seq.')
-    plt.ylim(-0.35, 0.35)
-    plt.yticks(np.arange(start=-0.3, stop=0.4, step=0.1))
-    plt.legend(title=' ', edgecolor='white', loc='upper left', bbox_to_anchor=(-0.15, -0.1),
-               columnspacing=1, framealpha=0, handletextpad=0.2, ncols=2)
-    plt.figtext(x=0.06, y=0.11, s='Selection', rotation='vertical')
-    plt.tight_layout()
-    plt.savefig(plot_dir / 'afs-impact-search-fs-method-metric-diff.pdf')
+    print('\nHow is the feature-set-quality difference per experimental setting between',
+          'simultaneous search (sum-aggregation) and sequential search distributed for different',
+          'feature-selection methods and numbers of alternatives (for k=5 and 1-5 alternatives)?')
+    for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
+        plot_results = comparison_results.groupby(group_cols)[metric].mean().reset_index(
+            ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
+                    values=metric).reset_index()
+        plot_results['sim - seq'] = plot_results['sim. (sum)'] - plot_results['seq.']
+        print(f'Metric: {metric}')
+        print(plot_results.groupby(['fs_name', 'num_alternatives'])['sim - seq'].agg(
+            ['min', 'median', 'mean', 'max']).round(2))
 
     print('\n-- Optimization status --')
 
-    # To not bias analysis regarding the humber of alternatives (simultaneous-search results
+    # To not bias analysis regarding the number of alternatives (simultaneous-search results
     # duplicate optimization statuses within search runs, sequential-search results with higher
     # "a" always contains results from lower "a" as well), we only extract one status for each
     # dataset, cross-validation fold, feature-selection method, search method, "a", and "tau"
@@ -324,9 +283,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print(plot_results.groupby(['fs_name', 'search_name'])['optimization_status'].value_counts(
         normalize=True).round(4).apply('{:.2%}'.format))
 
-    # Table 3
-    print('\n## Table: Optimization status by search method and feature-selection method (for k=5',
-          'and 1-5 alternatives) ##\n')
+    print('\n## Table 6.3: Optimization status by search method and feature-selection method (for',
+          'k=5 and 1-5 alternatives) ##\n')
     print_results = (plot_results.groupby(['fs_name', 'search_name'])[
         'optimization_status'].value_counts(normalize=True) * 100).rename('Frequency').reset_index()
     print_results = print_results.pivot(index=['fs_name', 'search_name'], values='Frequency',
@@ -337,17 +295,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         axis='index').to_latex(hrules=True))
 
     print('\nHow is the optimization status distributed for different numbers of alternatives',
-          '(for simultaneous search with summed-quality objective, k=5, and excluding Greedy',
-          'Wrapper)?')
+          '(for simultaneous search with sum-aggregation, k=5, and excluding Greedy Wrapper)?')
     print(pd.crosstab(plot_results.loc[plot_results['search_name'] == 'sim. (sum)',
                                        'optimization_status'],
                       plot_results.loc[plot_results['search_name'] == 'sim. (sum)',
                                        'num_alternatives'],
                       normalize='columns').applymap('{:.2%}'.format))
 
-    # Table 4
-    print('\n## Table: Optimization status by number of alternatives (for simultaneous search with',
-          'summed-quality objective, k=5, and excluding Greedy Wrapper) ##\n')
+    print('\n## Table 6.4: Optimization status by number of alternatives (for simultaneous search',
+          'with sum-aggregation, k=5, and excluding Greedy Wrapper) ##\n')
     print_results = plot_results[plot_results['search_name'] == 'sim. (sum)']
     print_results = (print_results.groupby('num_alternatives')['optimization_status'].value_counts(
         normalize=True) * 100).rename('Frequency').reset_index()
@@ -382,12 +338,11 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         'optimization_time'].describe().round(3))
 
     print('\nHow is the optimization time distributed for different feature-selection methods',
-          '(for simultaneous search with summed-quality objective and k=5)?')
+          '(for simultaneous search with sum-aggregation and k=5)?')
     print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
         'fs_name')['optimization_time'].describe().round(2))
 
-    # Table 5
-    print('\n## Table: Mean optimization time by feature-selection method and search method',
+    print('\n## Table 6.5: Mean optimization time by feature-selection method and search method',
           '(for k=5 and 1-5 alternatives) ##\n')
     print_results = plot_results.groupby(['fs_name', 'search_name'])[
         'optimization_time'].mean().reset_index()
@@ -401,16 +356,14 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
             index='num_alternatives', columns='fs_name').round(3))
 
     print('\nWhat is the mean optimization time for different feature-selection methods and',
-          'numbers of alternatives (for simultaneous search with summed-quality objective and',
-          'k=5)?')
+          'numbers of alternatives (for simultaneous search with sum-aggregation and k=5)?')
     print_results = plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(
         ['fs_name', 'num_alternatives'])['optimization_time'].mean().reset_index()
     print_results = print_results.pivot(index='num_alternatives', columns='fs_name')
     print(print_results.round(3))
 
-    # Table 6
-    print('\n## Table: Mean optimization time by number of alternatives and feature-selection',
-          'method (for simultaneous search with summed-quality objective and k=5) ##\n')
+    print('\n## Table 6.6: Mean optimization time by number of alternatives and feature-selection',
+          'method (for simultaneous search with sum-aggregation and k=5) ##\n')
     print(print_results.style.format('{:.2f}~s'.format).to_latex(hrules=True))
 
     print('\nWhat is the mean optimization time for different feature-selection methods and',
@@ -419,8 +372,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
         'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 
     print('\nWhat is the mean optimization time for different feature-selection methods and',
-          'dataset dimensionalities "n" (for simultaneous search with summed-quality objective and',
-          'k=5)?')
+          'dataset dimensionalities "n" (for simultaneous search with sum-aggregation and k=5)?')
     print(plot_results[plot_results['search_name'] == 'sim. (sum)'].groupby(['fs_name', 'n'])[
         'optimization_time'].mean().reset_index().pivot(index='n', columns='fs_name').round(3))
 

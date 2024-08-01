@@ -181,7 +181,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     print('\n-- Optimization status --')
 
-    # To not bias analysis regarding the humber of alternatives (simultaneous-search results
+    # To not bias analysis regarding the number of alternatives (simultaneous-search results
     # duplicate optimization statuses within search runs, sequential-search results with higher
     # "a" always contains results from lower "a" as well), we only extract one status for each
     # dataset, cross-validation fold, feature-selection method, search method, "a", and "tau"
