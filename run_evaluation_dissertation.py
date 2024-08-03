@@ -193,6 +193,15 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                               (results['n_alternative'] <= num_alternatives)].copy()
         seq_results['num_alternatives'] = num_alternatives
         comparison_results = pd.concat([comparison_results, seq_results])
+    # Filter search settings where any search method has any invalid feature set in its search run
+    # (when we compare search methods over alternatives, all combinations of these two dimensions
+    # should have the same number of fully feasible search runs, else the mean/variance of
+    # feature-set quality in search runs may be biased (in particular, sequential seach may return
+    # less than the desired number of alternatives while simultaneous search is all-or-nothing)
+    # or the comparison over alternatives may be biased
+    filter_group_cols = [x for x in group_cols if x not in ['search_name', 'num_alternatives']]
+    valid_results = comparison_results.groupby(filter_group_cols).filter(
+        lambda x: x['train_objective'].notna().all())
     plot_metrics = ['train_objective', 'test_objective', 'decision_tree_test_mcc']
 
     print('\n-- Variance in feature-set quality --')
@@ -201,13 +210,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'for different feature-selection methods, search methods, and numbers of alternatives',
           '(for k=5 and 1-5 alternatives)?')
     for metric in plot_metrics:
-        print(comparison_results.groupby(group_cols)[metric].std().reset_index().rename(
+        print(valid_results.groupby(group_cols)[metric].std().reset_index().rename(
             columns={'num_alternatives': 'a'}).groupby(['fs_name', 'search_name', 'a'])[
                 metric].median().reset_index().pivot(
                     index=['fs_name', 'a'], columns='search_name').round(3))
 
         # Figures 6.2a-6.2c: Standard dev. of feature-set quality in search runs by search method
-        plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
+        plot_results = valid_results[valid_results['fs_name'] == 'Model Gain']
         plot_results = plot_results.groupby(group_cols)[metric].std().reset_index()
         plt.figure(figsize=(8, 3))
         plt.rcParams['font.size'] = 15
@@ -231,13 +240,13 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           '(for k=5 and 1-5 alternatives)?')
     for metric, ylim, min_tick in zip(
             plot_metrics, [(-0.05, 1.05), (-0.05, 0.65), (-0.3, 1.05)], [0, 0, -0.2]):
-        print(comparison_results.groupby(group_cols)[metric].mean().reset_index().rename(
+        print(valid_results.groupby(group_cols)[metric].mean().reset_index().rename(
             columns={'num_alternatives': 'a'}).groupby(['fs_name', 'search_name', 'a'])[
                 metric].median().reset_index().pivot(
                     index=['fs_name', 'a'], columns='search_name').round(3))
 
         # Figures 6.3a-6.3c: Average feature-set quality in search runs by search method
-        plot_results = comparison_results[comparison_results['fs_name'] == 'Model Gain']
+        plot_results = valid_results[valid_results['fs_name'] == 'Model Gain']
         plot_results = plot_results.groupby(group_cols)[metric].mean().reset_index()
         plt.figure(figsize=(8, 3))
         plt.rcParams['font.size'] = 15
@@ -258,7 +267,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'simultaneous search (sum-aggregation) and sequential search distributed for different',
           'feature-selection methods and numbers of alternatives (for k=5 and 1-5 alternatives)?')
     for metric in ['train_objective', 'test_objective', 'decision_tree_test_mcc']:
-        plot_results = comparison_results.groupby(group_cols)[metric].mean().reset_index(
+        plot_results = valid_results.groupby(group_cols)[metric].mean().reset_index(
             ).pivot(index=[x for x in group_cols if x != 'search_name'], columns='search_name',
                     values=metric).reset_index()
         plot_results['sim - seq'] = plot_results['sim. (sum)'] - plot_results['seq.']
@@ -270,13 +279,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
     search_methods = [(('sim. (min)', 'bal.'), 'sim'), (('seq.', 'rep.'), 'seq')]
     for search_method_pair, search_method_file_infix in search_methods:
-        # Filter all search settings where any search method has at least one invalid feature set
-        # (while solver-based simultaneous search and Greedy Balancing always yield no or all
-        # desired alternatives, solver-based sequential search and Greedy Replacement may differ in
-        # their number of valid alternatives, which biases their mean quality within search runs):
-        plot_results = comparison_results[comparison_results['fs_name'].isin(['MI', 'Model Gain'])]
-        plot_results = plot_results.groupby([x for x in group_cols if x != 'search_name']).filter(
-            lambda x: x['train_objective'].notna().all())
+        plot_results = valid_results[valid_results['fs_name'].isin(['MI', 'Model Gain'])]
 
         plot_results = plot_results[plot_results['search_name'].isin(search_method_pair)]
         plot_results = plot_results.groupby(group_cols)[plot_metrics].mean().reset_index()
