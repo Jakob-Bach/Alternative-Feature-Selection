@@ -239,7 +239,7 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
           'different feature-selection methods, search methods, and numbers of alternatives',
           '(for k=5 and 1-5 alternatives)?')
     for metric, ylim, min_tick in zip(
-            plot_metrics, [(-0.05, 1.05), (-0.05, 0.65), (-0.3, 1.05)], [0, 0, -0.2]):
+            plot_metrics, [(-0.05, 1.05), (-0.05, 1.05), (-0.3, 1.05)], [0, 0, -0.2]):
         print(valid_results.groupby(group_cols)[metric].mean().reset_index().rename(
             columns={'num_alternatives': 'a'}).groupby(['fs_name', 'search_name', 'a'])[
                 metric].median().reset_index().pivot(
