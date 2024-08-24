@@ -89,16 +89,10 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
     print('\n## Table 6.2: Dataset overview ##\n')
     dataset_overview = data_handling.load_dataset_overview(directory=data_dir)
     dataset_overview = dataset_overview[['dataset', 'n_instances', 'n_features']]
-    dataset_overview['Mean corr.'] = dataset_overview['dataset'].apply(
-        lambda x: data_handling.mean_feature_corr(dataset_name=x, directory=data_dir)).round(2)
     dataset_overview.rename(columns={'dataset': 'Dataset', 'n_instances': '$m$',
                                      'n_features': '$n$'}, inplace=True)
-    dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('GAMETES', 'G')
-    dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('_Epistasis', 'E')
-    dataset_overview['Dataset'] = dataset_overview['Dataset'].str.replace('_Heterogeneity', 'H')
     dataset_overview.sort_values(by='Dataset', key=lambda x: x.str.lower(), inplace=True)
-    print(dataset_overview.style.format(escape='latex', precision=2).hide(axis='index').to_latex(
-        hrules=True))
+    print(dataset_overview.style.format(escape='latex').hide(axis='index').to_latex(hrules=True))
 
     print('\n-------- 6.4 Evaluation --------')
 
