@@ -718,6 +718,10 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                     swap_variables.append(s[j_1])
                     s[j_2].SetBounds(1 - s_value[j_2], 1 - s_value[j_2])
                     swap_variables.append(s[j_2])
+                objective = solver.Sum([s_j if s_value_j else 1 - s_j
+                                        for s, s_value in zip(s_list, s_value_list)
+                                        for s_j, s_value_j in zip(s, s_value)])
+                solver.Maximize(objective)  # Hamming similarity to previous selection
                 optimization_status = solver.Solve()
                 iters = iters + 1
                 restart_indexing = False
