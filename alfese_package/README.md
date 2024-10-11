@@ -1,6 +1,6 @@
-# `afs` -- A Python Package for Alternative Feature Selection
+# `alfese` -- A Python Package for Alternative Feature Selection
 
-The package `afs` contains several methods for alternative feature selection.
+The package `alfese` contains several methods for alternative feature selection.
 Alternative feature selection is the problem of finding multiple feature sets (sequentially or simultaneously)
 that optimize feature-set quality while being sufficiently dissimilar to each other.
 Users can control the number of alternatives and a dissimilarity threshold.
@@ -46,13 +46,13 @@ or [our other paper](https://doi.org/10.48550/arXiv.2307.11607)
 You can install our package from [PyPI](https://pypi.org/):
 
 ```
-python -m pip install afs
+python -m pip install alfese
 ```
 
 Alternatively, you can install the package from GitHub:
 
 ```bash
-python -m pip install git+https://github.com/Jakob-Bach/Alternative-Feature-Selection.git#subdirectory=afs_package
+python -m pip install git+https://github.com/Jakob-Bach/Alternative-Feature-Selection.git#subdirectory=alfese_package
 ```
 
 If you already have the source code for the package (i.e., the directory in which this `README` resides)
@@ -64,7 +64,7 @@ python -m pip install .
 
 ## Functionality
 
-`afs.py` contains six feature-selection methods as classes:
+`alfese.py` contains six feature-selection methods as classes:
 
 - `FCBFSelector`: (adapted version of) FCBF, a multivariate filter method
 - `GreedyWrapperSelector`: a wrapper method (by default, using a decision tree as prediction model)
@@ -113,14 +113,14 @@ Running alternative feature selection only requires three steps:
       aggregate feature-set quality over feature sets) and the heuristic search methods.
 
 ```python
-import afs
+import alfese
 import sklearn.datasets
 import sklearn.model_selection
 
 dataset = sklearn.datasets.load_iris(as_frame=True)
 X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(
     dataset['data'], dataset['target'], train_size=0.8, random_state=25)
-feature_selector = afs.MISelector()
+feature_selector = alfese.MISelector()
 feature_selector.set_data(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
 search_result = feature_selector.search_sequentially(k=3, num_alternatives=5, tau_abs=1)
 print(search_result.drop(columns='optimization_time').round(2))
@@ -152,9 +152,9 @@ If you don't want to provide a dataset but use manually defined univariate quali
 (which result in the same optimization problem as "MI" and model importance), you can do so as well:
 
 ```python
-import afs
+import alfese
 
-feature_selector = afs.ManualQualityUnivariateSelector()
+feature_selector = alfese.ManualQualityUnivariateSelector()
 feature_selector.set_data(q_train=[1, 2, 3, 7, 8, 9])
 search_result = feature_selector.search_sequentially(k=3, num_alternatives=3, tau_abs=2)
 print(search_result.drop(columns='optimization_time').round(2))

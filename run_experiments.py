@@ -21,15 +21,15 @@ import sklearn.metrics
 import sklearn.tree
 import tqdm
 
-import afs
+import alfese
 import data_handling
 
 
 # Different components of the experimental design, excluding the names of the search methods for
 # alternatives (hard-coded below) and prediction models (queried from the module "prediction").
 N_FOLDS = 5  # cross-validation for search and predictions
-FEATURE_SELECTOR_TYPES = [afs.FCBFSelector, afs.GreedyWrapperSelector, afs.MISelector,
-                          afs.ModelImportanceSelector, afs.MRMRSelector]
+FEATURE_SELECTOR_TYPES = [alfese.FCBFSelector, alfese.GreedyWrapperSelector, alfese.MISelector,
+                          alfese.ModelImportanceSelector, alfese.MRMRSelector]
 K_VALUES = [5, 10]  # sensible values of "tau" will be determined automatically
 NUM_ALTERNATIVES_SEQUENTIAL = 10  # sequential search (also yields all intermediate solutions)
 NUM_ALTERNATIVES_SIMULTANEOUS_VALUES = [1, 2, 3, 4, 5]  # simultaneous search
@@ -83,7 +83,7 @@ def evaluate_prediction_performance(
 # parameters "k", "tau_abs", "num_alternatives", and "objective_agg".
 # Return a table with various evaluation metrics, including parametrization of the search,
 # objective value, and prediction performance with the feature sets found.
-def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_search_func_name: str,
+def evaluate_one_search(feature_selector: alfese.AlternativeFeatureSelector, afs_search_func_name: str,
                         k: int, tau_abs: int, num_alternatives: int,
                         objective_agg: str = 'sum') -> pd.DataFrame:
     X_train, X_test, y_train, y_test = feature_selector.get_data()
@@ -118,7 +118,7 @@ def evaluate_one_search(feature_selector: afs.AlternativeFeatureSelector, afs_se
 # table to "results_dir".
 def evaluate_feature_selector(
         dataset_name: str, data_dir: pathlib.Path, results_dir: pathlib.Path, split_idx: int,
-        feature_selector_type: Type[afs.AlternativeFeatureSelector]) -> pd.DataFrame:
+        feature_selector_type: Type[alfese.AlternativeFeatureSelector]) -> pd.DataFrame:
     results = []
     X, y = data_handling.load_dataset(dataset_name=dataset_name, directory=data_dir)
     feature_selector = feature_selector_type()
@@ -139,7 +139,7 @@ def evaluate_feature_selector(
                     k=k, tau_abs=tau_abs, num_alternatives=num_alternatives,
                     objective_agg=objective_agg))
             # For univariate filter feature-selection, also evaluate heuristics:
-            if feature_selector_type in (afs.MISelector, afs.ModelImportanceSelector):
+            if feature_selector_type in (alfese.MISelector, alfese.ModelImportanceSelector):
                 results.append(evaluate_one_search(
                     feature_selector=feature_selector,
                     afs_search_func_name='search_greedy_replacement',

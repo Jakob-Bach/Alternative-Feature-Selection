@@ -48,8 +48,8 @@ The code files comprise our experimental pipeline (see below for details):
 - `data_handling.py`: Functions for working with prediction datasets and experimental data.
 
 Additionally, we have organized the (alternative) feature-selection methods for our experiments
-as the standalone Python package `afs`, located in the directory `afs_package/`.
-See the corresponding [README](afs_package/README.md) for more information.
+as the standalone Python package `alfese`, located in the directory `alfese_package/`.
+See the corresponding [README](alfese_package/README.md) for more information.
 
 ## Setup
 
