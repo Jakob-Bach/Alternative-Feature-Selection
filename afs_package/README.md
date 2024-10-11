@@ -1,6 +1,11 @@
 # `afs` -- A Python Package for Alternative Feature Selection
 
 The package `afs` contains several methods for alternative feature selection.
+Alternative feature selection is the problem of finding multiple feature sets (sequentially or simultaneously)
+that optimize feature-set quality while being sufficiently dissimilar to each other.
+Users can control the number of alternatives and a dissimilarity threshold.
+The package can also be used for traditional feature selection (i.e., sequential search with zero alternatives)
+but may not be the most efficient solution for this purpose.
 
 This document provides:
 
@@ -21,9 +26,30 @@ If you use this package for a scientific publication, please cite [our paper](ht
 }
 ```
 
+(is partially outdated regarding our current implementation, e.g., does not describe the heuristic search methods)
+or [our other paper](https://doi.org/10.48550/arXiv.2307.11607)
+
+```
+@misc{bach2023finding,
+	title={Finding Optimal Diverse Feature Sets with Alternative Feature Selection},
+	author={Bach, Jakob},
+	howpublished={arXiv:2307.11607 [cs.LG]},
+	year={2023},
+	doi={10.48550/arXiv.2307.11607}
+}
+```
+
+(at least the most recent version is more up-to-date than the journal version).
+
 ## Setup
 
-You can directly install this package from GitHub:
+You can install our package from [PyPI](https://pypi.org/):
+
+```
+python -m pip install afs
+```
+
+Alternatively, you can install the package from GitHub:
 
 ```bash
 python -m pip install git+https://github.com/Jakob-Bach/Alternative-Feature-Selection.git#subdirectory=afs_package
@@ -33,7 +59,7 @@ If you already have the source code for the package (i.e., the directory in whic
 as a local directory on your computer (e.g., after cloning the project), you can also perform a local install:
 
 ```bash
-python -m pip install afs_package/
+python -m pip install .
 ```
 
 ## Functionality
@@ -49,11 +75,14 @@ python -m pip install afs_package/
   (by default, a decision tree)
 - `MRMRSelector`: mRMR, a multivariate filter method
 
+The feature-selection method determines the notion of feature-set quality, i.e., the optimization objective.
+
 Additionally, there are the following abstract superclasses:
 
 - `AlternativeFeatureSelector`: highest superclass; defines solver, constraints for alternatives,
-  and sequential/simultaneous search
-- `LinearQualityFeatureSelector`:  super-class for feature-selection methods with a linear objective
+  and solver-based sequential/simultaneous search
+- `LinearQualityFeatureSelector`:  super-class for feature-selection methods with a linear objective;
+  defines heuristic search methods for alternatives (do not require a solver)
 - `WhiteBoxFeatureSelector`: superclass for feature-selection methods with a white-box objective,
   i.e., optimizing purely with a solver rather than using the solver in an algorithmic search routine
 
@@ -64,23 +93,24 @@ as demonstrated next.
 
 Running alternative feature selection only requires three steps:
 
-1) Create the feature selector (our code contains five different ones).
+1) Create the feature selector (our code contains five different ones),
+  thereby determining the notion of feature-set quality to be optimized.
 2) Set the dataset (`set_data()`):
     - Four parameters: feature part and prediction target are separated, train-test split
     - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
 3) Run the search for alternatives:
     - Method name (`search_sequentially()` / `search_simultaneously()`) determines whether
-      a sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s (like "MI" and
-      model-based importance) also support the heuristic procedures `search_greedy_replacement()`
-      and `search_greedy_balancing()`, which are described in the Appendix of the arXiv paper.
+      a (solver-based) sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s
+      (like "MI" and model-based importance) also support the heuristic procedures
+      `search_greedy_replacement()` and `search_greedy_balancing()`.
     - `k` determines the number of features to be selected.
     - `num_alternatives` determines ... you can guess what.
-    - `tau_abs` determines by how many features the feature sets should differ.
+    - `tau_abs` determines by how many features the feature sets should differ from each other.
       You can also provide a relative value (from the interval `[0,1]`) via `tau`,
-      and change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
-    - `objective_agg` switches between min-aggregation and sum-aggregation in simultaneous search.
+      or change the dissimilarity `d_name` to `'jaccard'` (default is `'dice'`).
+    - `objective_agg` switches between min-aggregation and sum-aggregation in solver-based simultaneous search.
       Has no effect in sequential search (which only returns one feature set, so there is no need to
-      aggregate feature-set quality over feature sets).
+      aggregate feature-set quality over feature sets) and the heuristic search methods.
 
 ```python
 import afs
@@ -134,7 +164,7 @@ print(search_result.drop(columns='optimization_time').round(2))
 
 `AlternativeFeatureSelector` is the topmost abstract superclass.
 It contains code for solver handling, the dissimilarity-based definition of alternatives, and the
-two search procedures, i.e., sequential as well as simultaneous (sum-aggregation and min-aggregation).
+two solver-based search procedures, i.e., sequential as well as simultaneous (sum-aggregation and min-aggregation).
 For defining a new feature-selection method, you should create a subclass of `AlternativeFeatureSelector`.
 In particular, you need to define how to solve the optimization problem of alternative feature selection
 by overriding the abstract method `select_and_evaluate()`.
@@ -151,7 +181,7 @@ as they should work as-is in new subclasses as well.
 There are further abstract superclasses extracting commonalities between feature-selection methods:
 
 -  `WhiteBoxFeatureSelector` is a good starting point if you want to optimize your objective with a solver
-  (rather than only using the solver to check constraints while optimizing a black-box objective separately, like Greedy Wrapper does).
+  (rather than using the solver in an algorithmic search routine with a black-box objective, like Greedy Wrapper does).
   When creating a subclass, you need to define the white-box objective by overriding the abstract method `create_objectives()`
   (define objectives separately for training set and test set, as they may use different constants for feature qualities).
   `select_and_evaluate()` and `initialize_solver()` need not be overridden in your subclass anymore.

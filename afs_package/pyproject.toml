@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "afs"
-version = "0.0.1"
+version = "1.0.0"
 authors = [
-    {name="Jakob Bach"},
+    {name="Jakob Bach", email="jakob.bach.ka@gmail.com"},
 ]
 description = "Alternative feature selection"
 keywords = ["feature selection", "alternatives", "constraints"]
@@ -25,5 +25,5 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Jakob-Bach/Alternative-Feature-Selection"
+Homepage = "https://github.com/Jakob-Bach/Alternative-Feature-Selection/tree/main/afs_package"
 Issues = "https://github.com/Jakob-Bach/Alternative-Feature-Selection/issues"

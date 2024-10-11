@@ -2,7 +2,8 @@
 
 Classes (and methods) for alternative feature selection, i.e.,
 - constraints and search routines for alternatives (mostly in an abstract superclass), particularly
-  sequential search and simultaneous search (supported by all feature-selection methods)
+  solver-based sequential search and simultaneous search (supported by all feature-selection
+  methods) and heuristic search methods (for univariate feature qualities)
 - feature-selection methods (determining the objective of the search) from different categories,
  i.e., filter, wrapper, and post-hoc importance
 
