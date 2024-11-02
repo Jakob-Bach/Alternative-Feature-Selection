@@ -645,9 +645,9 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
                 ).pivot(index='tau_abs', columns='fs_name').round(2))
 
         print(f'\nHow does the feature-set quality ({normalization_name}-normalized per',
-              'experimental setting) (Spearman-)correlate with dataset dimensionality "n" for ',
-              'each alternative and dissimilarity treshold "tau" (for sequential search with k=10',
-              'and MI as feature-selection method)?')
+              'experimental setting) (Spearman-)correlate with dataset dimensionality "n" for',
+              'each alternative and dissimilarity threshold "tau" (for sequential search with',
+              'k=10 and MI as feature-selection method)?')
         for metric in plot_metrics:
             with warnings.catch_warnings():
                 warnings.filterwarnings(action='ignore',

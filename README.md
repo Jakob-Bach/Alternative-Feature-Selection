@@ -21,6 +21,7 @@ Use the tags `run-2024-01-23` and `evaluation-2024-02-01` for reproducing the [e
 
 is a dissertation in progress.
 Once it is published, we will link it (and its experimental data) here as well.
+Use the tags `run-2024-09-28-dissertation` and `evaluation-2024-11-02-dissertation` for reproducing the experiments.
 
 This document provides:
 

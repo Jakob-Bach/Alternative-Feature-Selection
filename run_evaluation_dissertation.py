@@ -481,8 +481,8 @@ def evaluate(data_dir: pathlib.Path, results_dir: pathlib.Path, plot_dir: pathli
 
         print(f'\nHow does the feature-set quality ({normalization_name}-normalized per',
               'experimental setting) (Spearman-)correlate with dataset dimensionality "n" for',
-              'each alternative and dissimilarity treshold "tau" (for sequential search with k=10',
-              'and Model Gain as feature-selection method)?')
+              'each alternative and dissimilarity threshold "tau" (for sequential search with',
+              'k=10 and Model Gain as feature-selection method)?')
         for metric in plot_metrics:
             with warnings.catch_warnings():
                 warnings.filterwarnings(action='ignore',
