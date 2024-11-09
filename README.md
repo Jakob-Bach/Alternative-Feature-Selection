@@ -1,6 +1,18 @@
 # Alternative Feature Selection
 
-This repository contains the code of two papers and a dissertation:
+This repository contains the code for
+
+- two papers,
+- (parts of) a dissertation,
+- and the Python package [`alfese`](https://pypi.org/project/alfese/).
+
+This document provides:
+
+- An overview of the [related publications](#publications).
+- An outline of the [repo structure](#repo-structure).
+- Steps for [setting up](#setup) a virtual environment and [reproducing](#reproducing-the-experiments) the experiments.
+
+## Publications
 
 > Bach, Jakob, and Klemens Böhm. "Alternative feature selection with user control"
 
@@ -20,13 +32,9 @@ Use the tags `run-2024-01-23` and `evaluation-2024-02-01` for reproducing the [e
 > Bach, Jakob. "Leveraging Constraints for User-Centric Feature Selection"
 
 is a dissertation in progress.
-Once it is published, we will link it (and its experimental data) here as well.
+Once it is published, we will link it here as well.
+You can find the corresponding complete experimental data (inputs as well as results) on [*RADAR4KIT*](https://doi.org/10.35097/4kjyeg0z2bxmr6eh).
 Use the tags `run-2024-09-28-dissertation` and `evaluation-2024-11-02-dissertation` for reproducing the experiments.
-
-This document provides:
-
-- An outline of the [repo structure](#repo-structure).
-- Steps for [setting up](#setup) a virtual environment and [reproducing](#reproducing-the-experiments) the experiments.
 
 ## Repo Structure
 
