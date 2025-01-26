@@ -28,7 +28,7 @@ You can find the paper [here](https://doi.org/10.48550/arXiv.2307.11607).
 You can find the corresponding complete experimental data (inputs as well as results) on *RADAR4KIT*.
 Use the tags `run-2023-06-23` and `evaluation-2023-07-04` for reproducing the [experimental data for v1](https://doi.org/10.35097/1623) of the paper.
 Use the tags `run-2024-01-23` and `evaluation-2024-02-01` for reproducing the [experimental data for v2](https://doi.org/10.35097/1920) of the paper.
-Use the tags `run-2024-09-28-arXiv-v3` and `evaluation-2024-12-08-arXiv-v3` for reproducing the experimental data for v3 of the paper.
+Use the tags `run-2024-09-28-arXiv-v3` and `evaluation-2024-12-08-arXiv-v3` for reproducing the [experimental data for v3](https://doi.org/10.35097/4ttgrpx92p30jwww) of the paper.
 
 > Bach, Jakob. "Leveraging Constraints for User-Centric Feature Selection"
 
