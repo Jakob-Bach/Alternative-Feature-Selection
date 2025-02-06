@@ -14,14 +14,14 @@ This document provides:
 
 ## Publications
 
-> Bach, Jakob, and Klemens Böhm. "Alternative feature selection with user control"
+> Bach, Jakob, and Klemens Böhm (2024): "Alternative feature selection with user control"
 
 is published in the [International Journal of Data Science and Analytics](https://link.springer.com/journal/41060).
 You can find the paper [here](https://doi.org/10.1007/s41060-024-00527-8).
 You can find the corresponding complete experimental data (inputs as well as results) on [*RADAR4KIT*](https://doi.org/10.35097/1975).
 Use the tags `run-2023-06-23` and `evaluation-2024-03-19` for reproducing the experiments.
 
-> Bach, Jakob. "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
+> Bach, Jakob (2023): "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
 
 is published on [*arXiv*](https://arxiv.org/).
 You can find the paper [here](https://doi.org/10.48550/arXiv.2307.11607).
@@ -30,10 +30,10 @@ Use the tags `run-2023-06-23` and `evaluation-2023-07-04` for reproducing the [e
 Use the tags `run-2024-01-23` and `evaluation-2024-02-01` for reproducing the [experimental data for v2](https://doi.org/10.35097/1920) of the paper.
 Use the tags `run-2024-09-28-arXiv-v3` and `evaluation-2024-12-08-arXiv-v3` for reproducing the [experimental data for v3](https://doi.org/10.35097/4ttgrpx92p30jwww) of the paper.
 
-> Bach, Jakob. "Leveraging Constraints for User-Centric Feature Selection"
+> Bach, Jakob (2025): "Leveraging Constraints for User-Centric Feature Selection"
 
-is a dissertation in progress.
-Once it is published, we will link it here as well.
+is a dissertation at the [Department of Informatics](https://www.informatik.kit.edu/english/index.php) of the [Karlsruhe Institute of Technology](https://www.kit.edu/english/).
+You can find the dissertation [here](https://doi.org/10.5445/IR/1000178649).
 You can find the corresponding complete experimental data (inputs as well as results) on [*RADAR4KIT*](https://doi.org/10.35097/4kjyeg0z2bxmr6eh).
 Use the tags `run-2024-09-28-dissertation` and `evaluation-2024-11-02-dissertation` for reproducing the experiments.
 
