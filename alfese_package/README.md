@@ -14,32 +14,30 @@ This document provides:
 - A [demo](#demo) of the functionality.
 - [Guidelines for developers](#developer-info) who want to modify or extend the code base.
 
-If you use this package for a scientific publication, please cite [our paper](https://doi.org/10.1007/s41060-024-00527-8)
+If you use this package for a scientific publication, please cite [our journal paper](https://doi.org/10.1007/s41060-024-00527-8)
 
 ```
 @article{bach2024alternative,
-  title={Alternative feature selection with user control},
-  author={Bach, Jakob and B{\"o}hm, Klemens},
-  journal={International Journal of Data Science and Analytics},
-  year={2024},
-  doi={10.1007/s41060-024-00527-8}
+	title={Alternative feature selection with user control},
+	author={Bach, Jakob and B{\"o}hm, Klemens},
+	journal={International Journal of Data Science and Analytics},
+	year={2024},
+	doi={10.1007/s41060-024-00527-8}
 }
 ```
 
 (is partially outdated regarding our current implementation, e.g., does not describe the heuristic search methods)
-or [our other paper](https://doi.org/10.48550/arXiv.2307.11607)
+or [its (newer and longer) arXiv version](https://doi.org/10.48550/arXiv.2307.11607)
 
 ```
 @misc{bach2023finding,
 	title={Finding Optimal Diverse Feature Sets with Alternative Feature Selection},
 	author={Bach, Jakob},
-	howpublished={arXiv:2307.11607 [cs.LG]},
-	year={2023},
+	howpublished={arXiv:2307.11607v3 [cs.LG]},
+	year={2025},
 	doi={10.48550/arXiv.2307.11607}
 }
 ```
-
-(at least the most recent version is more up-to-date than the journal version).
 
 ## Setup
 
