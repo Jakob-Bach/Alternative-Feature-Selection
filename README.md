@@ -152,6 +152,9 @@ python -m prepare_datasets
 
 to download and pre-process the input data for the experiments (prediction datasets from PMLB).
 
+:warning: Since February 2025, this script has not been working anymore (see [this issue](https://github.com/Jakob-Bach/Alternative-Feature-Selection/issues/1) for details).
+Instead, obtain the script's output folder `datasets/` from the experimental data (for the paper version of your choice) [linked above](#publications).
+
 Next, start the experimental pipeline with
 
 ```bash
