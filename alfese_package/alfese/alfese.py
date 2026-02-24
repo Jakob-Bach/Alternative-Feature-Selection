@@ -878,6 +878,44 @@ class MISelector(LinearQualityFeatureSelector):
         return qualities / qualities.sum()
 
 
+class FStatisticSelector(LinearQualityFeatureSelector):
+    """Alternative feature selection with F-statistic
+
+    Univariate filter feature-selection method that uses the (ANOVA) F-statistic between each
+    feature and the prediction target in the linear objective function.
+    """
+
+    def compute_qualities(self, X: pd.DataFrame, y: pd.Series) -> np.ndarray:
+        """Compute univariate feature qualities
+
+        Compute the quality of each feature as the F-statistic between it and the prediction
+        target, i.e., assessing the usefulness of the feature as a single regressor to predict the
+        target in a linear model. Normalize such that selecting all features yields a feature-set
+        quality of 1.
+        Note that `sklearn` has two different methods to compute the F-statistic, one for
+        classification and one for regression. We use the one for regression here (which is a simple
+        transformation of the Pearson correlation between feature and target), so results may be
+        misleading if `y` represents a multi-class target. For binary classification, both
+        computation methods yield the same result, so binary targets are supported here.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Feature values of the dataset. Each row is a data object, each column a feature.
+        y : pd.Series
+            Prediction target. Must have the same number of entries as `X` has rows.
+            Should be continous or binary, but not multi-class discrete.
+
+        Returns
+        -------
+        np.ndarray
+            One quality per feature, i.e., as many qualities as `X` has columns.
+        """
+
+        qualities = sklearn.feature_selection.f_regression(X=X, y=y)[0]  # while [1] stores p-values
+        return qualities / qualities.sum()
+
+
 class FCBFSelector(MISelector):
     """Alternative feature selection with Fast Correlation-Based Filter (FCBF)
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alfese"
-version = "1.1.0dev"
+version = "1.1.0"
 authors = [
     {name="Jakob Bach", email="jakob.bach.ka@gmail.com"},
 ]

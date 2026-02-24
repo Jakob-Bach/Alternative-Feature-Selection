@@ -63,13 +63,15 @@ python -m pip install .
 
 ## Functionality
 
-`alfese.py` contains six feature-selection methods as classes:
+`alfese.py` contains seven feature-selection methods as classes:
 
 - `FCBFSelector`: (adapted version of) FCBF, a multivariate filter method
+- `FStatisticSelector`: a univariate filter method based on the F-statistic,
+  assessing the usefulness of each feature in univariate linear regression
 - `GreedyWrapperSelector`: a wrapper method (by default, using a decision tree as prediction model)
 - `ManualUnivariateQualitySelector`: a univariate filter method where you can enter each feature's utility directly
   (instead of computing it from a dataset)
-- `MISelector`: a univariate filter method based on mutual information
+- `MISelector`: a univariate filter method based on mutual information between each feature and the target
 - `ModelImportanceSelector`: a univariate filter method using feature importances from a prediction model
   (by default, a decision tree), similar to `sklearn`'s `feature_selection.SelectFromModel`
 - `MRMRSelector`: mRMR, a multivariate filter method
@@ -92,10 +94,10 @@ as demonstrated next.
 
 Running alternative feature selection only requires three steps:
 
-1) Create the feature selector (our code contains six different ones),
-  thereby determining the notion of feature-set quality to be optimized.
+1) Create the feature selector, thereby determining the notion of feature-set quality to be optimized.
 2) Set the dataset (`set_data()`):
     - Four parameters: feature part and prediction target are separated, train-test split
+    - Most feature-selection methods support classification and regression targets.
     - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
     - Exception: `ManualUnivariateQualitySelector` has different interface:
       only two parameters, representing pre-computed train/test quality for each feature (as list, array, etc.)
