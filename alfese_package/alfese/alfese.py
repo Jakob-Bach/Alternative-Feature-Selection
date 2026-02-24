@@ -12,21 +12,21 @@ Literature
 - Bach (2023): "Finding Optimal Diverse Feature Sets with Alternative Feature Selection"
 - Bach & Böhm (2024): "Alternative feature selection with user control"
 """
+from __future__ import annotations
 
-
-from abc import ABCMeta, abstractmethod
 import math
 import time
-from typing import Iterable, Optional, Sequence, Tuple, Union
+from abc import ABCMeta, abstractmethod
+from typing import Iterable, Optional, Sequence, Union
 
 import numpy as np
-from ortools.linear_solver import pywraplp
 import pandas as pd
 import sklearn.base
 import sklearn.feature_selection
 import sklearn.metrics
 import sklearn.model_selection
 import sklearn.tree
+from ortools.linear_solver import pywraplp
 
 
 class AlternativeFeatureSelector(metaclass=ABCMeta):
@@ -54,7 +54,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
     - Bach & Böhm (2024): "Alternative feature selection with user control"
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alternative feature selection
 
         Define all fields that are used later, without assigning a proper value yet. In particular,
@@ -102,7 +102,7 @@ class AlternativeFeatureSelector(metaclass=ABCMeta):
         self._y_test = y_test
         self._n = X_train.shape[1]
 
-    def get_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    def get_data(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """Get data for searching alternative feature sets
 
         The data set with :meth:`set_data`, in the same order.
@@ -391,7 +391,7 @@ class WhiteBoxFeatureSelector(AlternativeFeatureSelector, metaclass=ABCMeta):
     :meth:`create_objectives`, which is specific to the feature-selection method.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alternative feature selection
 
         In addition to the fields defined by the superclass, store the objective functions for the
@@ -405,7 +405,7 @@ class WhiteBoxFeatureSelector(AlternativeFeatureSelector, metaclass=ABCMeta):
     @abstractmethod
     def create_objectives(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
-            -> Tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
+            -> tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
         """Create objectives for alternative feature selection
 
         Should return expressions for train objective and test objective (one expression per
@@ -536,7 +536,7 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
     methods (:meth:`search_greedy_balancing` and :meth:`search_greedy_replacement`).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alternative feature selection
 
         In addition to the fields defined by the superclass, store the univariate feature qualities
@@ -603,7 +603,7 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
 
     def create_objectives(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
-            -> Tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
+            -> tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
         """Create linear objectives for alternative feature selection
 
         Formulate training-set and test-set objective (feature-set quality) for each feature set as
@@ -616,7 +616,7 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
         s_list : Sequence[Sequence[pywraplp.Variable]]
             The decision variables for feature selection. One list per desired feature set.
         k : int
-            The number of features to be selected.
+            The number of features to be selected. Unused in this type of objective.
 
         Returns
         -------
@@ -691,13 +691,12 @@ class LinearQualityFeatureSelector(WhiteBoxFeatureSelector, metaclass=ABCMeta):
             'test_objective': sum(q_j * s_j for (q_j, s_j) in zip(self._q_test, s)),
             'optimization_status': pywraplp.Solver.FEASIBLE  # heuristic -> potentially suboptimal
         } for s in s_list]
-        for i in range(i, num_alternatives + 1):  # in case algorithm ran out of features early
-            results.append({
-                'selected_idxs': [],
-                'train_objective': float('nan'),
-                'test_objective': float('nan'),
-                'optimization_status': pywraplp.Solver.NOT_SOLVED  # heuristic: solution may exist
-            })
+        results.extend({
+            'selected_idxs': [],
+            'train_objective': float('nan'),
+            'test_objective': float('nan'),
+            'optimization_status': pywraplp.Solver.NOT_SOLVED  # heuristic: solution may exist
+        } for _ in range(i, num_alternatives + 1)) # in case algorithm ran out of features early
         results = pd.DataFrame(results)
         results['optimization_time'] = end_time - start_time
         return results
@@ -876,8 +875,7 @@ class MISelector(LinearQualityFeatureSelector):
         """
 
         qualities = MISelector.mutual_info(X=X, y=y)
-        qualities = qualities / qualities.sum()
-        return qualities
+        return qualities / qualities.sum()
 
 
 class FCBFSelector(MISelector):
@@ -897,7 +895,7 @@ class FCBFSelector(MISelector):
     Solution"
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alternative feature selection
 
         In addition to the fields defined by the superclass, store the unnormalized feature-target
@@ -983,7 +981,7 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
     qualities in a linear objective function.
     """
 
-    def __init__(self, prediction_model: Optional[sklearn.base.BaseEstimator] = None):
+    def __init__(self, prediction_model: Optional[sklearn.base.BaseEstimator] = None) -> None:
         """Initialize alternative feature selection
 
         In addition to the fields defined by the superclass, store the prediction model whose
@@ -1042,7 +1040,7 @@ class MRMRSelector(WhiteBoxFeatureSelector):
     """
 
     # Initialize all fields.
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alternative feature selection
 
         In addition to the fields defined by the superclass, store the feature-target and
@@ -1098,17 +1096,16 @@ class MRMRSelector(WhiteBoxFeatureSelector):
         # Max-normalize MI values (min is 0 anyway, in theory due to definition of MI and in
         # practice due to our self-redundancy fix above); to be consistent to the other feature
         # selectors, normalize train and test with separate max values:
-        max_mi_train = max(self._mi_target_train.max(),
-                           max(x.max() for x in self._mi_features_train))
+        max_mi_train = max(self._mi_target_train.max(), *(x.max() for x in self._mi_features_train))
         self._mi_target_train = self._mi_target_train / max_mi_train
         self._mi_features_train = [x / max_mi_train for x in self._mi_features_train]
-        max_mi_test = max(self._mi_target_test.max(), max(x.max() for x in self._mi_features_test))
+        max_mi_test = max(self._mi_target_test.max(), *(x.max() for x in self._mi_features_test))
         self._mi_target_test = self._mi_target_test / max_mi_test
         self._mi_features_test = [x / max_mi_test for x in self._mi_features_test]
 
     def create_objectives(self, solver: pywraplp.Solver,
                           s_list: Sequence[Sequence[pywraplp.Variable]], k: int) \
-            -> Tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
+            -> tuple[Sequence[pywraplp.LinearExpr], Sequence[pywraplp.LinearExpr]]:
         """Create mRMR objectives for alternative feature selection
 
         Formulate training-set and test-set objective (feature-set quality) for each feature set by
@@ -1211,7 +1208,7 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
     """
 
     def __init__(self, prediction_model: Optional[sklearn.base.BaseEstimator] = None,
-                 max_iters: int = 1000):
+                 max_iters: int = 1000) -> None:
         """Initialize alternative feature selection
 
         In addition to the fields defined by the superclass, store the maximum iteration count and
@@ -1397,12 +1394,11 @@ class GreedyWrapperSelector(AlternativeFeatureSelector):
                 if restart_indexing:
                     j_1 = 0  # re-start swapping with first feature (zero indexing!) ...
                     j_2 = j_1 + 1  # ... and second feature
-                else:
-                    if j_2 < self._n - 1:  # "inner loop": only increase index of second feature
-                        j_2 = j_2 + 1
-                    else:  # "outer loop": increase index of first feature and reset second
-                        j_1 = j_1 + 1
-                        j_2 = j_1 + 1
+                elif j_2 < self._n - 1:  # "inner loop": only increase index of second feature
+                    j_2 = j_2 + 1
+                else:  # "outer loop": increase index of first feature and reset second
+                    j_1 = j_1 + 1
+                    j_2 = j_1 + 1
                 for s_j in swap_variables:
                     s_j.SetBounds(0, 1)  # revert fixing to one value (make regular binary again)
                 swap_variables.clear()  # next iteration will swap at different position

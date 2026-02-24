@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alfese"
-version = "1.0.0"
+version = "1.1.0dev"
 authors = [
     {name="Jakob Bach", email="jakob.bach.ka@gmail.com"},
 ]
@@ -27,3 +27,22 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/Jakob-Bach/Alternative-Feature-Selection/tree/main/alfese_package"
 Issues = "https://github.com/Jakob-Bach/Alternative-Feature-Selection/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # missing trailing comma
+    "D", # documentation linting
+    "EM101", # passing string literal to Exception initializer (instead of assigning to variable first)
+    "N803", # argument name not in snake case (may refer to upper-case variables from problem formulation like Q or X)
+    "N806", # variable name not in snake case (may refer to upper-case variables from problem formulation like Q or X)
+    "Q000", # due to historic reasons, we use single quotes as primary quotes in code
+    "S101", # asserts
+    "TRY003", # passing message to Exception initializer instead of specifying separate class
+    "UP007", # old "Union" type annotation (without |)
+    "UP045", # old "Optional" type annotation (without |)
+]
