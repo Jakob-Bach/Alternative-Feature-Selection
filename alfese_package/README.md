@@ -26,7 +26,8 @@ If you use this package for a scientific publication, please cite [our journal p
 }
 ```
 
-(is partially outdated regarding our current implementation, e.g., does not describe the heuristic search methods)
+(is partially outdated regarding our current implementation, e.g., does not describe the heuristic search methods
+and refers to an older version of the wrapper method)
 or [its (newer and longer) arXiv version](https://doi.org/10.48550/arXiv.2307.11607)
 
 ```
@@ -70,7 +71,7 @@ python -m pip install .
   (instead of computing it from a dataset)
 - `MISelector`: a univariate filter method based on mutual information
 - `ModelImportanceSelector`: a univariate filter method using feature importances from a prediction model
-  (by default, a decision tree)
+  (by default, a decision tree), similar to `sklearn`'s `feature_selection.SelectFromModel`
 - `MRMRSelector`: mRMR, a multivariate filter method
 
 The feature-selection method determines the notion of feature-set quality, i.e., the optimization objective.
@@ -91,11 +92,13 @@ as demonstrated next.
 
 Running alternative feature selection only requires three steps:
 
-1) Create the feature selector (our code contains five different ones),
+1) Create the feature selector (our code contains six different ones),
   thereby determining the notion of feature-set quality to be optimized.
 2) Set the dataset (`set_data()`):
     - Four parameters: feature part and prediction target are separated, train-test split
     - Data types: `DataFrame` (feature parts) and `Series` (targets) from `pandas`
+    - Exception: `ManualUnivariateQualitySelector` has different interface:
+      only two parameters, representing pre-computed train/test quality for each feature (as list, array, etc.)
 3) Run the search for alternatives:
     - Method name (`search_sequentially()` / `search_simultaneously()`) determines whether
       a (solver-based) sequential or a simultaneous search is run. `LinearQualityFeatureSelector`s

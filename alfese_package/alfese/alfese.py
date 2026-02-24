@@ -978,7 +978,10 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
     """Alternative feature selection with post-hoc importance
 
     Use post-hoc feature-importance scores from a trained prediction model as univariate feature
-    qualities in a linear objective function.
+    qualities in a linear objective function. We obtain these feature importances similarly to
+    `sklearn.feature_selection.SelectFromModel` (which internally dispatches to
+    `sklearn.feature_selection._base._get_feature_importances()`), i.e., we use explicitly computed
+    importances (for tree-based models) or absolute coefficient sizes (for linear models).
     """
 
     def __init__(self, prediction_model: Optional[sklearn.base.BaseEstimator] = None) -> None:
@@ -992,8 +995,8 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
         prediction_model : Optional[sklearn.base.BaseEstimator], optional
             The prediction model for computing feature qualities. If none provided, create a
             decision tree as default one. A user-provided model should have an attribute
-            `feature_importances_` after fitting (though the model passed here does not need to be
-            fit yet, though, only initialized).
+            `feature_importances_` or `coef_` after fitting, with the former being preferred.
+            The model passed here should not be fit yet, only initialized.
         """
 
         super().__init__()
@@ -1006,6 +1009,8 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
         """Compute univariate feature qualities
 
         Compute the quality of each feature as its importance in a trained prediction model.
+        Typically normalized, i.e., selecting all features yields a feature-set quality of 1,
+        while selecting no features yields a feature-set quality of 0.
 
         Parameters
         ----------
@@ -1014,13 +1019,26 @@ class ModelImportanceSelector(LinearQualityFeatureSelector):
         y : pd.Series
             Prediction target. Must have the same number of entries as `X` has rows.
 
+        Raises
+        ------
+        AttributeError
+            The prediction model set in the initializer does not contain feature importances after
+            fitting, i.e., neither has an attribute `feature_importances_` nor `coef_`.
+
         Returns
         -------
         np.ndarray
             One quality per feature, i.e., as many qualities as `X` has columns.
         """
 
-        return self._prediction_model.fit(X=X, y=y).feature_importances_
+        self._prediction_model.fit(X=X, y=y)
+        if hasattr(self._prediction_model, 'feature_importances_'):
+            return self._prediction_model.feature_importances_
+        if hasattr(self._prediction_model, 'coef_'):
+            qualities = np.abs(self._prediction_model.coef_)  # as sklearn, consider magnitude
+            return qualities / qualities.sum()  # normalize (other importances are by default)
+        raise AttributeError('The model passed during this object\'s initialization needs to have'
+                             'an attribute "feature_importances_" or "coef_" after fitting.')
 
 
 class MRMRSelector(WhiteBoxFeatureSelector):
